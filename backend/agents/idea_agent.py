@@ -41,14 +41,13 @@ Return a JSON object with:
 }}
 
 Important scoring calibration (CRITICAL - follow this exactly):
-- 90-100: Strong idea. Unique angle, clear audience hook, good monetization. Ready to publish.
-- 80-89: Good idea but missing a sharp angle or hook. Publishable with minor improvements.
-- 70-79: Decent concept, too generic. Needs a unique angle.
-- 60-69: Weak. Too broad or too niche. Major rework needed.
-- Below 60: Bad idea. Skip.
+- 90-100: Truly excellent, viral potential, unique angle. Immediate publish.
+- 85-89: Strong idea. Good hook, clear audience, solid monetization. Ready to publish.
+- 80-84: Decent concept but could be sharper. Publishable with minor tweaks.
+- 70-79: Generic or too niche. Needs a better angle.
+- Below 70: Weak idea. Skip.
 
-Score HONESTLY. Most decent ideas should score 80-85. Only truly great ideas hit 90+.
-Do NOT score under 70 unless the idea is genuinely bad. Do NOT score 90+ unless it's truly excellent.
+Score HONESTLY but GENEROUSLY. Most decent topics should score 85-90. Only bad ideas score below 80.
 
 Calculate total as weighted average (must match the individual category scores mathematically). Return ONLY valid JSON, no markdown."""
         result = router.generate(prompt, temperature=0.9)
