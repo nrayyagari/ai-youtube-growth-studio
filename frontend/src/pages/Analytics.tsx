@@ -96,6 +96,28 @@ export default function Analytics() {
     setLoading(false);
   };
 
+  const handleYoutubeSync = async () => {
+    if (!selectedChannel) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/youtube/sync/${selectedChannel}`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Sync failed");
+      }
+      const data = await res.json();
+      const stats = data._channel_stats;
+      if (stats) {
+        setError(`Synced: ${stats.title} — ${stats.subscribers?.toLocaleString()} subs, ${stats.total_views?.toLocaleString()} views`);
+      }
+      loadData(selectedChannel);
+    } catch (err: any) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>Analytics Dashboard</h2>
@@ -111,6 +133,11 @@ export default function Analytics() {
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+        {selectedChannel && (
+          <button onClick={handleYoutubeSync} disabled={loading} style={styles.syncBtn}>
+            {loading ? "Syncing..." : "Sync from YouTube"}
+          </button>
+        )}
       </div>
 
       {error && <div style={styles.error}>{error}</div>}
@@ -194,7 +221,7 @@ export default function Analytics() {
 const styles: Record<string, React.CSSProperties> = {
   container: { padding: 24, maxWidth: 1100 },
   title: { fontSize: 22, marginBottom: 20, color: "#e0e0e0" },
-  channelSelect: { marginBottom: 20 },
+  channelSelect: { marginBottom: 20, display: "flex", gap: 12, alignItems: "center" },
   select: {
     padding: "10px 14px",
     borderRadius: 6,
@@ -203,6 +230,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#eee",
     fontSize: 14,
     minWidth: 250,
+  },
+  syncBtn: {
+    padding: "10px 20px",
+    borderRadius: 6,
+    border: "1px solid #4ade80",
+    background: "transparent",
+    color: "#4ade80",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: 14,
   },
   card: {
     background: "#1e1e2e",

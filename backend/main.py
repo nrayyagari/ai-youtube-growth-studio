@@ -14,6 +14,7 @@ from core.config import settings
 from core.router import AIProviderRouter, AllProvidersExhausted
 from core.pipeline import PipelineRunner, PipelineError
 from agents.master_router_agent import MasterRouterAgent
+from core.youtube_analytics import YouTubeAnalyticsService
 
 app = FastAPI(title="AI YouTube Growth Studio")
 
@@ -891,6 +892,255 @@ Return JSON:
     conn.commit()
     conn.close()
     return {"recommendations": created}
+
+
+# ─── YouTube OAuth Routes ───
+
+class YouTubeOAuthConfig(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+@app.post("/api/youtube/oauth/url")
+def get_youtube_oauth_url(body: YouTubeOAuthConfig):
+    redirect_uri = settings.youtube_redirect_uri
+    if not body.client_id or not body.client_secret:
+        raise HTTPException(400, "Client ID and Client Secret are required")
+    try:
+        auth_url = YouTubeAnalyticsService.get_auth_url(
+            body.client_id, body.client_secret, redirect_uri
+        )
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("youtube_client_id", body.client_id),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("youtube_client_secret", body.client_secret),
+    )
+    conn.commit()
+    conn.close()
+    return {"auth_url": auth_url}
+
+
+@app.get("/api/youtube/oauth/callback")
+def youtube_oauth_callback(code: str, state: str = ""):
+    conn = get_db()
+    client_id = conn.execute(
+        "SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)
+    ).fetchone()
+    client_secret = conn.execute(
+        "SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)
+    ).fetchone()
+    conn.close()
+
+    if not client_id or not client_secret:
+        raise HTTPException(400, "Configure YouTube OAuth credentials first")
+
+    try:
+        tokens = YouTubeAnalyticsService.exchange_code(
+            client_id["value"], client_secret["value"],
+            settings.youtube_redirect_uri, code,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"OAuth exchange failed: {str(e)}")
+
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("youtube_refresh_token", tokens["refresh_token"]),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"status": "connected", "expires_at": tokens.get("expiry")}
+
+
+@app.get("/api/youtube/oauth/status")
+def youtube_oauth_status():
+    conn = get_db()
+    row = conn.execute(
+        "SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)
+    ).fetchone()
+    conn.close()
+    return {"connected": bool(row and row["value"])}
+
+
+# ─── YouTube Analytics Fetch Routes ───
+
+@app.post("/api/youtube/fetch/channel-stats")
+def fetch_youtube_channel_stats():
+    conn = get_db()
+    cid = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)).fetchone()
+    secret = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)).fetchone()
+    token = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)).fetchone()
+    conn.close()
+
+    if not token or not token["value"]:
+        raise HTTPException(400, "YouTube not connected. Run OAuth setup first.")
+
+    try:
+        svc = YouTubeAnalyticsService(
+            cid["value"] if cid else "",
+            secret["value"] if secret else "",
+            token["value"],
+        )
+        stats = svc.get_channel_stats()
+    except Exception as e:
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+    return stats
+
+
+@app.post("/api/youtube/fetch/analytics")
+def fetch_youtube_analytics(days: int = 30):
+    conn = get_db()
+    cid = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)).fetchone()
+    secret = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)).fetchone()
+    token = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)).fetchone()
+    conn.close()
+
+    if not token or not token["value"]:
+        raise HTTPException(400, "YouTube not connected.")
+
+    try:
+        svc = YouTubeAnalyticsService(
+            cid["value"] if cid else "",
+            secret["value"] if secret else "",
+            token["value"],
+        )
+        analytics = svc.get_channel_analytics(days)
+    except Exception as e:
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+    return analytics
+
+
+@app.post("/api/youtube/fetch/top-videos")
+def fetch_top_videos(max_results: int = 10, days: int = 30):
+    conn = get_db()
+    cid = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)).fetchone()
+    secret = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)).fetchone()
+    token = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)).fetchone()
+    conn.close()
+
+    if not token or not token["value"]:
+        raise HTTPException(400, "YouTube not connected.")
+
+    try:
+        svc = YouTubeAnalyticsService(
+            cid["value"] if cid else "",
+            secret["value"] if secret else "",
+            token["value"],
+        )
+        videos = svc.get_top_videos(max_results, days)
+    except Exception as e:
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+    return videos
+
+
+@app.post("/api/youtube/fetch/demographics")
+def fetch_demographics(days: int = 90):
+    conn = get_db()
+    cid = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)).fetchone()
+    secret = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)).fetchone()
+    token = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)).fetchone()
+    conn.close()
+
+    if not token or not token["value"]:
+        raise HTTPException(400, "YouTube not connected.")
+
+    try:
+        svc = YouTubeAnalyticsService(
+            cid["value"] if cid else "",
+            secret["value"] if secret else "",
+            token["value"],
+        )
+        demos = svc.get_demographics(days)
+    except Exception as e:
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+    return demos
+
+
+@app.post("/api/youtube/sync/{channel_id}")
+def sync_youtube_to_snapshot(channel_id: int):
+    conn = get_db()
+    cid = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)).fetchone()
+    secret = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)).fetchone()
+    token = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)).fetchone()
+    conn.close()
+
+    if not token or not token["value"]:
+        raise HTTPException(400, "YouTube not connected.")
+
+    try:
+        svc = YouTubeAnalyticsService(
+            cid["value"] if cid else "",
+            secret["value"] if secret else "",
+            token["value"],
+        )
+        channel_stats = svc.get_channel_stats()
+        if "error" in channel_stats:
+            raise HTTPException(500, channel_stats["error"])
+
+        analytics = svc.get_channel_analytics(30)
+        if "error" in analytics:
+            raise HTTPException(500, analytics["error"])
+
+        demos = svc.get_demographics(90)
+
+        snapshot_data = svc.create_snapshot_from_analytics(channel_stats, analytics)
+        snapshot_data["demographics"] = json.dumps(demos)
+
+        today = datetime.date.today().isoformat()
+        conn = get_db()
+        existing = conn.execute(
+            "SELECT id FROM analytics_snapshots WHERE channel_id = ? AND snapshot_date = ?",
+            (channel_id, today),
+        ).fetchone()
+
+        if existing:
+            conn.execute(
+                """UPDATE analytics_snapshots SET views = ?, watch_time_minutes = ?,
+                   subscribers = ?, avg_ctr = ?, avg_retention = ?,
+                   top_videos = ?, demographics = ?
+                   WHERE id = ?""",
+                (snapshot_data["views"], snapshot_data["watch_time_minutes"],
+                 snapshot_data["subscribers"], snapshot_data["avg_ctr"],
+                 snapshot_data["avg_retention"], snapshot_data["top_videos"],
+                 snapshot_data["demographics"], existing["id"]),
+            )
+            snap_id = existing["id"]
+        else:
+            cursor = conn.execute(
+                """INSERT INTO analytics_snapshots (channel_id, snapshot_date, views,
+                   watch_time_minutes, subscribers, avg_ctr, avg_retention,
+                   top_videos, demographics)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (channel_id, today, snapshot_data["views"], snapshot_data["watch_time_minutes"],
+                 snapshot_data["subscribers"], snapshot_data["avg_ctr"],
+                 snapshot_data["avg_retention"], snapshot_data["top_videos"],
+                 snapshot_data["demographics"]),
+            )
+            snap_id = cursor.lastrowid
+
+        conn.commit()
+        snap = conn.execute("SELECT * FROM analytics_snapshots WHERE id = ?", (snap_id,)).fetchone()
+        conn.close()
+
+        result = dict(snap)
+        result["_channel_stats"] = channel_stats
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Sync failed: {str(e)}")
 
 
 # ─── Settings Routes ───
