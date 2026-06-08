@@ -1,7 +1,10 @@
 import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import os
 
 from core.database import get_db, init_db
 from core.config import settings
@@ -335,6 +338,20 @@ def update_api_keys(body: APIKeysUpdate):
     conn.commit()
     conn.close()
     return {"status": "saved"}
+
+
+# ─── Static Frontend (catch-all must be last) ───
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        path = os.path.join(FRONTEND_DIR, full_path) if full_path else FRONTEND_DIR
+        if os.path.isfile(path):
+            return FileResponse(path)
+        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
 # ─── Seed Data ───
