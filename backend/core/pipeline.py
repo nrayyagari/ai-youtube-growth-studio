@@ -34,7 +34,7 @@ class PipelineRunner:
                 output = result.get("output", {})
                 if isinstance(output, dict):
                     inputs.update(self._flatten_output(output, agent.name))
-                time.sleep(15)  # cooldown for Groq free tier TPM (12K/min, ~15s to reset)
+                time.sleep(20)  # cooldown for Groq free tier TPM (12K/min)
             except Exception as e:
                 raise PipelineError(agent.name, str(e))
 
