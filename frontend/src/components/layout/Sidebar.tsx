@@ -6,6 +6,7 @@ const links = [
   { to: "/workflows", label: "Workflows" },
   { to: "/skills", label: "Skills" },
   { to: "/generate", label: "Generator" },
+  { to: "/analytics", label: "Analytics" },
   { to: "/settings", label: "Settings" },
 ];
 

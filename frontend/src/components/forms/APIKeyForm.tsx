@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 
 export default function APIKeyForm() {
   const [keys, setKeys] = useState({ gemini_api_key: "", grok_api_key: "", cerebras_api_key: "" });
-  const [status, setStatus] = useState({ gemini: false, grok: false, cerebras: false });
+  const [status, setStatus] = useState<Record<string, string | boolean>>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 

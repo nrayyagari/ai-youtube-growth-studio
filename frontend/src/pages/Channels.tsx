@@ -35,11 +35,17 @@ export default function Channels() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 640 }}>
           {channels.map((ch) => (
             <div key={ch.id} style={styles.row}>
-              <Link to={`/packages?channel=${ch.id}`} style={styles.name}>{ch.name}</Link>
-              <span style={styles.meta}>{ch.niche || "No niche"} · {ch.language}</span>
-              <span style={styles.meta}>{ch.content_mode?.replace("_", " ")}</span>
-              <div style={{ flex: 1 }} />
-              <button onClick={() => remove(ch.id)} style={styles.del}>Delete</button>
+              <div style={styles.channelInfo}>
+                <Link to={`/packages?channel=${ch.id}`} style={styles.name}>{ch.name}</Link>
+                <span style={styles.meta}>{ch.niche || "No niche"} · {ch.language}</span>
+                <span style={styles.meta}>{ch.content_mode?.replace("_", " ")}</span>
+              </div>
+              <div style={styles.actions}>
+                <Link to={`/channels/${ch.id}/reference-videos`} style={styles.actionLink}>Ref Videos</Link>
+                <Link to={`/channels/${ch.id}/style-profiles`} style={styles.actionLink}>Styles</Link>
+                <Link to={`/channels/${ch.id}/series`} style={styles.actionLink}>Series</Link>
+                <button onClick={() => remove(ch.id)} style={styles.del}>Delete</button>
+              </div>
             </div>
           ))}
         </div>
@@ -63,14 +69,27 @@ const styles: Record<string, React.CSSProperties> = {
   row: {
     display: "flex",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 16,
     padding: "14px 16px",
     background: "#1a1a2e",
     borderRadius: 8,
     border: "1px solid #333",
   },
+  channelInfo: { display: "flex", alignItems: "center", gap: 16 },
   name: { color: "#e94560", textDecoration: "none", fontWeight: 600, fontSize: 15 },
   meta: { color: "#888", fontSize: 12 },
+  actions: { display: "flex", alignItems: "center", gap: 8 },
+  actionLink: {
+    color: "#888",
+    textDecoration: "none",
+    fontSize: 11,
+    padding: "3px 8px",
+    borderRadius: 3,
+    border: "1px solid #444",
+    background: "transparent",
+    transition: "border-color 0.15s",
+  },
   del: {
     padding: "6px 12px",
     background: "transparent",

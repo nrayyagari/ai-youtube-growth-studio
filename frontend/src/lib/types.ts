@@ -76,3 +76,32 @@ export interface ApprovalResult {
   failing: { category: string; score: number; required: number }[];
   corrections: string[];
 }
+
+export interface ReferenceVideo {
+  id: number;
+  channel_id: number;
+  url: string;
+  video_id: string;
+  title: string;
+  channel_name: string;
+  thumbnail_url: string;
+  duration: string;
+  transcript: string;
+  created_at: string;
+}
+
+export interface StyleProfile {
+  id: number;
+  channel_id: number;
+  name: string;
+  visual_style: string;
+  editing_style: string;
+  tone: string;
+  music_preferences: string;
+  pacing: string;
+  content_patterns: Record<string, any>;
+  hooks: string;
+  thumbnails_style: string;
+  raw_analysis: Record<string, any>;
+  created_at: string;
+}

@@ -49,4 +49,26 @@ export const api = {
   getApiKeys: () => request("/api/settings/apikeys"),
   updateApiKeys: (keys: any) =>
     request("/api/settings/apikeys", { method: "PUT", body: JSON.stringify(keys) }),
+
+  // Reference Videos
+  addReferenceVideo: (channelId: number, url: string) =>
+    request(`/api/channels/${channelId}/reference-videos`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  listReferenceVideos: (channelId: number) =>
+    request(`/api/channels/${channelId}/reference-videos`),
+  deleteReferenceVideo: (id: number) =>
+    request(`/api/reference-videos/${id}`, { method: "DELETE" }),
+
+  // Style Profiles
+  generateStyleProfile: (channelId: number, name: string) =>
+    request(`/api/channels/${channelId}/style-profiles/generate`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  listStyleProfiles: (channelId: number) =>
+    request(`/api/channels/${channelId}/style-profiles`),
+  deleteStyleProfile: (id: number) =>
+    request(`/api/style-profiles/${id}`, { method: "DELETE" }),
 };

@@ -104,6 +104,104 @@ def init_db():
             value TEXT DEFAULT '',
             updated_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS reference_videos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            url TEXT NOT NULL,
+            video_id TEXT NOT NULL,
+            title TEXT DEFAULT '',
+            channel_name TEXT DEFAULT '',
+            thumbnail_url TEXT DEFAULT '',
+            duration TEXT DEFAULT '',
+            metadata TEXT DEFAULT '{}',
+            transcript TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS style_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            visual_style TEXT DEFAULT '',
+            editing_style TEXT DEFAULT '',
+            tone TEXT DEFAULT '',
+            music_preferences TEXT DEFAULT '',
+            pacing TEXT DEFAULT '',
+            content_patterns TEXT DEFAULT '{}',
+            hooks TEXT DEFAULT '',
+            thumbnails_style TEXT DEFAULT '',
+            raw_analysis TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS series (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'PLANNING',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS episodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            series_id INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+            package_id INTEGER REFERENCES video_packages(id) ON DELETE SET NULL,
+            episode_number INTEGER NOT NULL,
+            title TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            arc_position TEXT DEFAULT '',
+            status TEXT DEFAULT 'PLANNED',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS competitor_analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            competitor_url TEXT NOT NULL,
+            analysis_type TEXT NOT NULL,
+            findings TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS pattern_library (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            pattern_type TEXT NOT NULL,
+            pattern_name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            examples TEXT DEFAULT '[]',
+            effectiveness_score REAL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS analytics_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            snapshot_date TEXT NOT NULL,
+            views INTEGER DEFAULT 0,
+            watch_time_minutes REAL DEFAULT 0,
+            subscribers INTEGER DEFAULT 0,
+            avg_ctr REAL DEFAULT 0,
+            avg_retention REAL DEFAULT 0,
+            top_videos TEXT DEFAULT '[]',
+            demographics TEXT DEFAULT '{}',
+            raw_data TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS recommendations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            snapshot_id INTEGER REFERENCES analytics_snapshots(id) ON DELETE SET NULL,
+            recommendation_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            priority INTEGER DEFAULT 0,
+            based_on TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
     """)
     conn.commit()
     conn.close()

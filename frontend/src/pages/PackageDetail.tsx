@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import type { JSX } from "react";
 import { api } from "../lib/api";
 import type { VideoPackage, ApprovalResult } from "../lib/types";
 import GrowthScoreBreakdown from "../components/reports/GrowthScoreBreakdown";

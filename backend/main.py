@@ -1,15 +1,19 @@
 import json
+import re
+import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import os
+import httpx
 
 from core.database import get_db, init_db
 from core.config import settings
 from core.router import AIProviderRouter, AllProvidersExhausted
 from core.pipeline import PipelineRunner, PipelineError
+from agents.master_router_agent import MasterRouterAgent
 
 app = FastAPI(title="AI YouTube Growth Studio")
 
@@ -310,6 +314,583 @@ def delete_package(package_id: int):
     conn.commit()
     conn.close()
     return {"status": "deleted"}
+
+
+# ─── Reference Video Routes ───
+
+class ReferenceVideoCreate(BaseModel):
+    url: str
+
+
+def _extract_youtube_id(url: str) -> str:
+    patterns = [
+        r"(?:v=|\/)([0-9A-Za-z_-]{11})(?:[?&]|$)",
+        r"youtu\.be\/([0-9A-Za-z_-]{11})",
+        r"embed\/([0-9A-Za-z_-]{11})",
+    ]
+    for p in patterns:
+        m = re.search(p, url)
+        if m:
+            return m.group(1)
+    raise HTTPException(400, "Could not extract YouTube video ID from URL")
+
+
+def _fetch_youtube_metadata(video_id: str) -> dict:
+    try:
+        oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        r = httpx.get(oembed_url, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            return {
+                "title": data.get("title", ""),
+                "channel_name": data.get("author_name", ""),
+                "thumbnail_url": data.get("thumbnail_url", ""),
+            }
+    except Exception:
+        pass
+    return {"title": "", "channel_name": "", "thumbnail_url": ""}
+
+
+def _fetch_youtube_transcript(video_id: str) -> str:
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return " ".join([entry["text"] for entry in transcript])
+    except Exception:
+        return ""
+
+
+@app.post("/api/channels/{channel_id}/reference-videos")
+def add_reference_video(channel_id: int, body: ReferenceVideoCreate):
+    conn = get_db()
+    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
+    if not channel:
+        conn.close()
+        raise HTTPException(404, "Channel not found")
+
+    video_id = _extract_youtube_id(body.url)
+    meta = _fetch_youtube_metadata(video_id)
+    transcript = _fetch_youtube_transcript(video_id)
+
+    cursor = conn.execute(
+        """INSERT INTO reference_videos (channel_id, url, video_id, title, channel_name,
+           thumbnail_url, transcript)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (channel_id, body.url, video_id, meta["title"], meta["channel_name"],
+         meta["thumbnail_url"], transcript),
+    )
+    conn.commit()
+    ref_id = cursor.lastrowid
+    conn.close()
+    return {"id": ref_id, "video_id": video_id, "title": meta["title"],
+            "channel_name": meta["channel_name"], "has_transcript": bool(transcript)}
+
+
+@app.get("/api/channels/{channel_id}/reference-videos")
+def list_reference_videos(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM reference_videos WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.delete("/api/reference-videos/{ref_id}")
+def delete_reference_video(ref_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM reference_videos WHERE id = ?", (ref_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+# ─── Style Profile Routes ───
+
+class StyleProfileCreate(BaseModel):
+    name: str
+
+
+@app.post("/api/channels/{channel_id}/style-profiles/generate")
+def generate_style_profile(channel_id: int, body: StyleProfileCreate):
+    conn = get_db()
+    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
+    if not channel:
+        conn.close()
+        raise HTTPException(404, "Channel not found")
+    ref_videos = conn.execute(
+        "SELECT * FROM reference_videos WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+
+    if not ref_videos:
+        raise HTTPException(400, "No reference videos for this channel")
+
+    channel_dict = dict(channel)
+    ref_list = [dict(v) for v in ref_videos]
+
+    try:
+        router = AIProviderRouter()
+        agent = MasterRouterAgent()
+        result = agent.analyze_reference(channel_dict, ref_list, router)
+    except AllProvidersExhausted as e:
+        raise HTTPException(429, str(e))
+
+    conn = get_db()
+    cursor = conn.execute(
+        """INSERT INTO style_profiles (channel_id, name, visual_style, editing_style, tone,
+           music_preferences, pacing, content_patterns, hooks, thumbnails_style, raw_analysis)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (channel_id, body.name,
+         result.get("visual_style", ""),
+         result.get("editing_style", ""),
+         result.get("tone", ""),
+         result.get("music_preferences", ""),
+         result.get("pacing", ""),
+         json.dumps(result.get("content_patterns", {})),
+         result.get("hooks", ""),
+         result.get("thumbnails_style", ""),
+         json.dumps(result)),
+    )
+    profile_id = cursor.lastrowid
+    conn.commit()
+
+    profile = conn.execute("SELECT * FROM style_profiles WHERE id = ?", (profile_id,)).fetchone()
+    conn.close()
+
+    p = dict(profile)
+    p["content_patterns"] = json.loads(p.get("content_patterns", "{}"))
+    p["raw_analysis"] = json.loads(p.get("raw_analysis", "{}"))
+    return p
+
+
+@app.get("/api/channels/{channel_id}/style-profiles")
+def list_style_profiles(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM style_profiles WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["content_patterns"] = json.loads(d.get("content_patterns", "{}"))
+        d["raw_analysis"] = json.loads(d.get("raw_analysis", "{}"))
+        result.append(d)
+    return result
+
+
+@app.delete("/api/style-profiles/{profile_id}")
+def delete_style_profile(profile_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM style_profiles WHERE id = ?", (profile_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+# ─── Series & Episodes Routes ───
+
+class SeriesCreate(BaseModel):
+    channel_id: int
+    name: str
+    description: str = ""
+
+
+class EpisodeCreate(BaseModel):
+    episode_number: int
+    title: str = ""
+    description: str = ""
+    arc_position: str = ""
+    package_id: int | None = None
+
+
+@app.post("/api/series")
+def create_series(body: SeriesCreate):
+    conn = get_db()
+    cursor = conn.execute(
+        "INSERT INTO series (channel_id, name, description) VALUES (?, ?, ?)",
+        (body.channel_id, body.name, body.description),
+    )
+    conn.commit()
+    sid = cursor.lastrowid
+    conn.close()
+    return {"id": sid, "name": body.name}
+
+
+@app.get("/api/series")
+def list_series(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM series WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.delete("/api/series/{series_id}")
+def delete_series(series_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM series WHERE id = ?", (series_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+@app.post("/api/series/{series_id}/episodes")
+def create_episode(series_id: int, body: EpisodeCreate):
+    conn = get_db()
+    cursor = conn.execute(
+        """INSERT INTO episodes (series_id, package_id, episode_number, title, description, arc_position)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (series_id, body.package_id, body.episode_number, body.title, body.description, body.arc_position),
+    )
+    conn.commit()
+    eid = cursor.lastrowid
+    conn.close()
+    return {"id": eid, "episode_number": body.episode_number}
+
+
+@app.get("/api/series/{series_id}/episodes")
+def list_episodes(series_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM episodes WHERE series_id = ? ORDER BY episode_number",
+        (series_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.put("/api/episodes/{episode_id}")
+def update_episode(episode_id: int, body: EpisodeCreate):
+    conn = get_db()
+    conn.execute(
+        """UPDATE episodes SET episode_number = ?, title = ?, description = ?,
+           arc_position = ?, package_id = ? WHERE id = ?""",
+        (body.episode_number, body.title, body.description, body.arc_position, body.package_id, episode_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "updated"}
+
+
+@app.delete("/api/episodes/{episode_id}")
+def delete_episode(episode_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+# ─── Pattern Analysis Routes ───
+
+class CompetitorAnalysisCreate(BaseModel):
+    competitor_url: str
+    analysis_type: str = "general"
+
+
+@app.post("/api/channels/{channel_id}/competitor-analysis")
+def run_competitor_analysis(channel_id: int, body: CompetitorAnalysisCreate):
+    conn = get_db()
+    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
+    if not channel:
+        conn.close()
+        raise HTTPException(404, "Channel not found")
+    conn.close()
+
+    try:
+        router = AIProviderRouter()
+        prompt = f"""You are a YouTube competitive analyst for faceless channels.
+
+Channel niche: {channel['niche']}
+Competitor URL: {body.competitor_url}
+
+Analyze this competitor channel and provide:
+1. Content strategy patterns
+2. Video format and structure
+3. Thumbnail and title strategies
+4. Engagement tactics
+5. Weaknesses or gaps that could be exploited
+6. What's working well that could be adapted
+
+Return JSON:
+{{
+  "content_strategy": "Analysis of content approach",
+  "format_patterns": "Video structure observations",
+  "thumbnail_strategy": "Thumbnail approach analysis",
+  "engagement_tactics": "How they drive engagement",
+  "weaknesses": ["gap1", "gap2"],
+  "strengths_to_adapt": ["strength1", "strength2"],
+  "overall_assessment": "Summary assessment"
+}}"""
+        result = router.generate(prompt, temperature=0.7, max_tokens=4096)
+        findings = json.loads(result) if isinstance(result, str) else result
+    except Exception as e:
+        raise HTTPException(500, f"Analysis failed: {str(e)}")
+
+    conn = get_db()
+    cursor = conn.execute(
+        "INSERT INTO competitor_analyses (channel_id, competitor_url, analysis_type, findings) VALUES (?, ?, ?, ?)",
+        (channel_id, body.competitor_url, body.analysis_type, json.dumps(findings)),
+    )
+    analysis_id = cursor.lastrowid
+    conn.commit()
+
+    row = conn.execute("SELECT * FROM competitor_analyses WHERE id = ?", (analysis_id,)).fetchone()
+    conn.close()
+    r = dict(row)
+    r["findings"] = json.loads(r["findings"])
+    return r
+
+
+@app.get("/api/channels/{channel_id}/competitor-analysis")
+def list_competitor_analyses(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM competitor_analyses WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["findings"] = json.loads(d["findings"])
+        result.append(d)
+    return result
+
+
+class PatternCreate(BaseModel):
+    pattern_type: str
+    pattern_name: str
+    description: str = ""
+    examples: str = "[]"
+
+
+@app.post("/api/channels/{channel_id}/patterns")
+def create_pattern(channel_id: int, body: PatternCreate):
+    conn = get_db()
+    cursor = conn.execute(
+        "INSERT INTO pattern_library (channel_id, pattern_type, pattern_name, description, examples) VALUES (?, ?, ?, ?, ?)",
+        (channel_id, body.pattern_type, body.pattern_name, body.description, body.examples),
+    )
+    conn.commit()
+    pid = cursor.lastrowid
+    conn.close()
+    return {"id": pid, "pattern_name": body.pattern_name}
+
+
+@app.get("/api/channels/{channel_id}/patterns")
+def list_patterns(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM pattern_library WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.delete("/api/patterns/{pattern_id}")
+def delete_pattern(pattern_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM pattern_library WHERE id = ?", (pattern_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+# ─── Analytics Routes ───
+
+class AnalyticsSnapshotCreate(BaseModel):
+    views: int = 0
+    watch_time_minutes: float = 0
+    subscribers: int = 0
+    avg_ctr: float = 0
+    avg_retention: float = 0
+    top_videos: str = "[]"
+    demographics: str = "{}"
+
+
+@app.post("/api/channels/{channel_id}/analytics")
+def create_analytics_snapshot(channel_id: int, body: AnalyticsSnapshotCreate):
+    conn = get_db()
+    snapshot_date = datetime.date.today().isoformat()
+    cursor = conn.execute(
+        """INSERT INTO analytics_snapshots (channel_id, snapshot_date, views, watch_time_minutes,
+           subscribers, avg_ctr, avg_retention, top_videos, demographics)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (channel_id, snapshot_date, body.views, body.watch_time_minutes, body.subscribers,
+         body.avg_ctr, body.avg_retention, body.top_videos, body.demographics),
+    )
+    snap_id = cursor.lastrowid
+    conn.commit()
+
+    row = conn.execute("SELECT * FROM analytics_snapshots WHERE id = ?", (snap_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.get("/api/channels/{channel_id}/analytics")
+def list_analytics_snapshots(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM analytics_snapshots WHERE channel_id = ? ORDER BY snapshot_date DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/channels/{channel_id}/analytics/latest")
+def get_latest_analytics(channel_id: int):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM analytics_snapshots WHERE channel_id = ? ORDER BY snapshot_date DESC LIMIT 1",
+        (channel_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "No analytics data")
+    return dict(row)
+
+
+@app.get("/api/channels/{channel_id}/analytics/compare")
+def compare_analytics(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT * FROM analytics_snapshots WHERE channel_id = ?
+           ORDER BY snapshot_date DESC LIMIT 2""",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    if len(rows) < 2:
+        return {"comparison": None, "message": "Need at least 2 snapshots to compare"}
+    latest = dict(rows[0])
+    previous = dict(rows[1])
+    changes = {}
+    for key in ["views", "watch_time_minutes", "subscribers", "avg_ctr", "avg_retention"]:
+        old_val = previous.get(key, 0) or 0
+        new_val = latest.get(key, 0) or 0
+        if old_val > 0:
+            changes[key] = round(((new_val - old_val) / old_val) * 100, 1)
+        else:
+            changes[key] = 0 if new_val == 0 else 100
+    return {"latest": latest, "previous": previous, "changes_pct": changes}
+
+
+class RecommendationCreate(BaseModel):
+    recommendation_type: str
+    title: str
+    description: str = ""
+    priority: int = 0
+    based_on: str = ""
+    snapshot_id: int | None = None
+
+
+@app.post("/api/channels/{channel_id}/recommendations")
+def create_recommendation(channel_id: int, body: RecommendationCreate):
+    conn = get_db()
+    cursor = conn.execute(
+        """INSERT INTO recommendations (channel_id, snapshot_id, recommendation_type, title,
+           description, priority, based_on)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (channel_id, body.snapshot_id, body.recommendation_type, body.title,
+         body.description, body.priority, body.based_on),
+    )
+    conn.commit()
+    rid = cursor.lastrowid
+    conn.close()
+    return {"id": rid, "title": body.title}
+
+
+@app.get("/api/channels/{channel_id}/recommendations")
+def list_recommendations(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM recommendations WHERE channel_id = ? ORDER BY priority DESC, created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/channels/{channel_id}/recommendations/generate")
+def generate_recommendations(channel_id: int):
+    conn = get_db()
+    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
+    if not channel:
+        conn.close()
+        raise HTTPException(404, "Channel not found")
+
+    snapshots = conn.execute(
+        "SELECT * FROM analytics_snapshots WHERE channel_id = ? ORDER BY snapshot_date DESC LIMIT 1",
+        (channel_id,),
+    ).fetchall()
+    profiles = conn.execute(
+        "SELECT * FROM style_profiles WHERE channel_id = ? ORDER BY created_at DESC LIMIT 1",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+
+    if not snapshots:
+        raise HTTPException(400, "No analytics data to base recommendations on")
+
+    snapshot_data = json.dumps(dict(snapshots[0]))
+    profile_data = json.dumps(dict(profiles[0])) if profiles else "{}"
+
+    try:
+        router = AIProviderRouter()
+        prompt = f"""You are a YouTube growth strategist.
+
+Channel: {channel['niche']}
+Latest analytics: {snapshot_data}
+Style profile: {profile_data}
+
+Based on the analytics and style data, generate 3-5 specific, actionable recommendations for the next video. Focus on:
+- What topic to cover next
+- How to improve CTR
+- How to improve retention
+- What format changes to try
+
+Return JSON:
+{{
+  "recommendations": [
+    {{
+      "type": "topic/format/ctr/retention/monetization",
+      "title": "Short recommendation title",
+      "description": "Detailed explanation",
+      "priority": 1,
+      "based_on": "What data this is based on"
+    }}
+  ]
+}}"""
+        result = router.generate(prompt, temperature=0.7, max_tokens=4096)
+        data = json.loads(result) if isinstance(result, str) else result
+        recs = data.get("recommendations", [])
+    except Exception as e:
+        raise HTTPException(500, f"Generation failed: {str(e)}")
+
+    conn = get_db()
+    created = []
+    snap_id = snapshots[0]["id"] if snapshots else -1
+    for rec in recs:
+        cursor = conn.execute(
+            """INSERT INTO recommendations (channel_id, snapshot_id, recommendation_type, title,
+               description, priority, based_on)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (channel_id, snap_id, rec.get("type", ""), rec.get("title", ""),
+             rec.get("description", ""), rec.get("priority", 1), rec.get("based_on", "")),
+        )
+        created.append({"id": cursor.lastrowid, "title": rec.get("title", "")})
+    conn.commit()
+    conn.close()
+    return {"recommendations": created}
 
 
 # ─── Settings Routes ───
