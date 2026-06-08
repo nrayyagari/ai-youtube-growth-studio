@@ -40,7 +40,13 @@ Return a JSON object:
   }}
 }}
 
-Scores 0-100. Be honest. Return ONLY valid JSON."""
+Scoring calibration:
+- 90-100: Excellent, engaging script. Strong hook, good pacing, clear segments.
+- 80-89: Good script, solid structure. Minor improvements needed.
+- 70-79: Decent but needs better hook or clearer structure.
+
+Score HONESTLY. Most good scripts should score 80-85. Only exceptional scripts score 90+.
+Scores 0-100. Return ONLY valid JSON."""
         result = router.generate(prompt, temperature=0.8, max_tokens=4096)
         data = self._safe_json(result)
         return {"output": data, "section_type": "script"}

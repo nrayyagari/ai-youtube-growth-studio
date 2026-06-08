@@ -36,6 +36,12 @@ Return a JSON object:
   "seo_score": {{"score": 85, "explanation": "..."}}
 }}
 
+Scoring calibration:
+- 90-100: Excellent titles with high CTR potential. Clever, curiosity-driven, keyword-rich.
+- 80-89: Good titles, solid SEO, decent click potential.
+- 70-79: OK but generic or overly clickbaity. Needs refinement.
+
+Score HONESTLY. Most good titles should score 80-85. Only truly standout titles score 90+.
 Scores 0-100. Return ONLY valid JSON."""
         result = router.generate(prompt, temperature=0.8)
         data = self._safe_json(result)

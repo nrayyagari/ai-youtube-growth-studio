@@ -40,18 +40,17 @@ Return a JSON object with:
   ]
 }}
 
-Important: Scores must be 0-100. Be honest and critical. High scores only for truly excellent ideas.
-Use the scoring categories:
-- topic_demand (20%): Is this topic searched for?
-- pain_point (15%): Does it solve a real problem?
-- ctr (15%): Will the title/hook make people click?
-- retention (15%): Will people watch till the end?
-- monetization (15%): Is this advertiser-friendly?
-- competition (10%): Is there space to compete?
-- series (5%): Can this be part of a series?
-- channel_fit (5%): Does it match the channel?
+Important scoring calibration (CRITICAL - follow this exactly):
+- 90-100: Strong idea. Unique angle, clear audience hook, good monetization. Ready to publish.
+- 80-89: Good idea but missing a sharp angle or hook. Publishable with minor improvements.
+- 70-79: Decent concept, too generic. Needs a unique angle.
+- 60-69: Weak. Too broad or too niche. Major rework needed.
+- Below 60: Bad idea. Skip.
 
-Calculate total as weighted average. Return ONLY valid JSON, no markdown."""
+Score HONESTLY. Most decent ideas should score 80-85. Only truly great ideas hit 90+.
+Do NOT score under 70 unless the idea is genuinely bad. Do NOT score 90+ unless it's truly excellent.
+
+Calculate total as weighted average (must match the individual category scores mathematically). Return ONLY valid JSON, no markdown."""
         result = router.generate(prompt, temperature=0.9)
         data = self._safe_json(result)
         return {"output": data, "section_type": "idea"}
