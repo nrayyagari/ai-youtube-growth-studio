@@ -55,33 +55,36 @@ class AIProviderRouter:
         self.tracker = RateTracker()
         self.ordering = ["gemini", "groq", "cerebras"]
 
-    def _get_db_key(self, key_name: str) -> str:
+    def _get_db_keys(self, key_name: str) -> list[str]:
         from core.database import get_db
 
         conn = get_db()
         row = conn.execute("SELECT value FROM settings WHERE key = ?", (key_name,)).fetchone()
         conn.close()
-        return row["value"] if row else ""
+        if not row or not row["value"]:
+            return []
+        return [k.strip() for k in row["value"].split(",") if k.strip()]
 
     def generate(self, prompt: str, system_prompt: str = "", temperature: float = 0.7, max_tokens: int = 4096) -> str:
         failures = []
         for name in self.ordering:
             cfg = self.PROVIDERS[name]
-            api_key = self._get_db_key(cfg["db_key"])
-            if not api_key:
+            api_keys = self._get_db_keys(cfg["db_key"])
+            if not api_keys:
                 failures.append(f"{name}: no API key configured")
                 continue
-            if not self.tracker.can_call(name, cfg["rpm"]):
-                failures.append(f"{name}: rate limited on our side")
-                continue
-            try:
-                result = self._call_provider(name, cfg, api_key, prompt, system_prompt, temperature, max_tokens)
-                self.tracker.record(name)
-                return result
-            except Exception as e:
-                failures.append(f"{name}: {e}")
-                time.sleep(3)  # brief cooldown before next provider
-                continue
+            for api_key in api_keys:
+                if not self.tracker.can_call(name, cfg["rpm"]):
+                    continue
+                try:
+                    result = self._call_provider(name, cfg, api_key, prompt, system_prompt, temperature, max_tokens)
+                    self.tracker.record(name)
+                    return result
+                except Exception as e:
+                    failures.append(f"{name}(key {api_key[:8]}...): {e}")
+                    time.sleep(1)
+                    continue
+            failures.append(f"{name}: all {len(api_keys)} keys exhausted")
         raise AllProvidersExhausted(
             "All AI providers failed. Details: " + "; ".join(failures)
         )
