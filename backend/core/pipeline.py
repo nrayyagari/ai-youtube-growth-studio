@@ -73,14 +73,14 @@ class PipelineRunner:
 
     def _evaluate_approval(self, results: list[dict]) -> dict:
         thresholds = {
-            "growth_score": 90,
-            "script_score": 90,
-            "title_score": 90,
-            "thumbnail_score": 90,
-            "copyright_safety": 90,
-            "factual_accuracy": 90,
-            "retention": 90,
-            "monetization": 90,
+            "growth_score": 85,
+            "script_score": 85,
+            "title_score": 85,
+            "thumbnail_score": 85,
+            "copyright_safety": 85,
+            "factual_accuracy": 85,
+            "retention": 85,
+            "monetization": 85,
         }
 
         scores = self._extract_scores(results)
