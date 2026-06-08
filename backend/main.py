@@ -899,11 +899,12 @@ Return JSON:
 class YouTubeOAuthConfig(BaseModel):
     client_id: str
     client_secret: str
+    redirect_uri: str = ""
 
 
 @app.post("/api/youtube/oauth/url")
 def get_youtube_oauth_url(body: YouTubeOAuthConfig):
-    redirect_uri = settings.youtube_redirect_uri
+    redirect_uri = body.redirect_uri or settings.youtube_redirect_uri
     if not body.client_id or not body.client_secret:
         raise HTTPException(400, "Client ID and Client Secret are required")
     try:
@@ -922,6 +923,10 @@ def get_youtube_oauth_url(body: YouTubeOAuthConfig):
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
         ("youtube_client_secret", body.client_secret),
     )
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("youtube_redirect_uri", redirect_uri),
+    )
     conn.commit()
     conn.close()
     return {"auth_url": auth_url}
@@ -936,7 +941,12 @@ def youtube_oauth_callback(code: str, state: str = ""):
     client_secret = conn.execute(
         "SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)
     ).fetchone()
+    redirect_uri_row = conn.execute(
+        "SELECT value FROM settings WHERE key = ?", ("youtube_redirect_uri",)
+    ).fetchone()
     conn.close()
+
+    redirect_uri = redirect_uri_row["value"] if redirect_uri_row else settings.youtube_redirect_uri
 
     if not client_id or not client_secret:
         return HTMLResponse(_oauth_page("Error", "YouTube OAuth credentials not configured.", False))
@@ -944,7 +954,7 @@ def youtube_oauth_callback(code: str, state: str = ""):
     try:
         tokens = YouTubeAnalyticsService.exchange_code(
             client_id["value"], client_secret["value"],
-            settings.youtube_redirect_uri, code,
+            redirect_uri, code,
         )
     except Exception as e:
         return HTMLResponse(_oauth_page("Error", f"OAuth exchange failed: {str(e)}", False))

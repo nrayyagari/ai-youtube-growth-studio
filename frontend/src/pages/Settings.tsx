@@ -23,15 +23,20 @@ export default function Settings() {
     setLoading(true);
     setMsg("");
     try {
+      const redirectUri = window.location.origin + "/api/youtube/oauth/callback";
       const res = await fetch("/api/youtube/oauth/url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+        }),
       });
       const data = await res.json();
       if (data.auth_url) {
         window.open(data.auth_url, "_blank");
-        setMsg("Complete OAuth in the opened window. Refresh status after.");
+        setMsg("Complete OAuth in the opened window. Then click Refresh Status.");
       }
     } catch (err: any) {
       setMsg("Error: " + err.message);
@@ -59,8 +64,12 @@ export default function Settings() {
         <h2 style={styles.sectionTitle}>YouTube Analytics OAuth</h2>
         <p style={styles.help}>
           Create a Google Cloud Project, enable YouTube Analytics API + YouTube Data API v3,
-          create an OAuth 2.0 Web Application credential with redirect URI:
-          <code style={styles.code}>http://localhost:8000/api/youtube/oauth/callback</code>
+          create an OAuth 2.0 Web Application credential. Add this exact redirect URI:
+          <code style={styles.code} id="redirectUri">
+            {typeof window !== "undefined"
+              ? window.location.origin + "/api/youtube/oauth/callback"
+              : "http://localhost:8000/api/youtube/oauth/callback"}
+          </code>
         </p>
         <div style={styles.status}>
           Status:{" "}
