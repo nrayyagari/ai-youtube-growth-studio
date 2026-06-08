@@ -4,7 +4,7 @@ import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 import os
 import httpx
@@ -939,7 +939,7 @@ def youtube_oauth_callback(code: str, state: str = ""):
     conn.close()
 
     if not client_id or not client_secret:
-        raise HTTPException(400, "Configure YouTube OAuth credentials first")
+        return HTMLResponse(_oauth_page("Error", "YouTube OAuth credentials not configured.", False))
 
     try:
         tokens = YouTubeAnalyticsService.exchange_code(
@@ -947,7 +947,7 @@ def youtube_oauth_callback(code: str, state: str = ""):
             settings.youtube_redirect_uri, code,
         )
     except Exception as e:
-        raise HTTPException(500, f"OAuth exchange failed: {str(e)}")
+        return HTMLResponse(_oauth_page("Error", f"OAuth exchange failed: {str(e)}", False))
 
     conn = get_db()
     conn.execute(
@@ -957,7 +957,7 @@ def youtube_oauth_callback(code: str, state: str = ""):
     conn.commit()
     conn.close()
 
-    return {"status": "connected", "expires_at": tokens.get("expiry")}
+    return HTMLResponse(_oauth_page("Connected!", "YouTube Analytics is now connected. You can close this tab and return to the app.", True))
 
 
 @app.get("/api/youtube/oauth/status")
@@ -1183,6 +1183,35 @@ if os.path.isdir(FRONTEND_DIR):
         if os.path.isfile(path):
             return FileResponse(path)
         return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+def _oauth_page(title: str, message: str, success: bool) -> str:
+    color = "#4ade80" if success else "#f87171"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title}</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #0f0f1a; color: #e0e0e0; display: flex;
+         justify-content: center; align-items: center; min-height: 100vh; margin: 0; }}
+  .card {{ background: #1e1e2e; border: 1px solid #333; border-radius: 12px;
+           padding: 40px 48px; text-align: center; max-width: 420px; }}
+  h1 {{ color: {color}; margin: 0 0 12px; font-size: 24px; }}
+  p {{ color: #888; font-size: 14px; line-height: 1.6; margin: 0 0 24px; }}
+  a {{ color: #e94560; text-decoration: none; font-weight: 600; }}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>{'&#10003;' if success else '&#10007;'} {title}</h1>
+  <p>{message}</p>
+  <p><a href="/">Back to Growth Studio</a></p>
+</div>
+</body>
+</html>"""
 
 
 # ─── Seed Data ───
