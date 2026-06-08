@@ -15,6 +15,10 @@ class BaseAgent(ABC):
 
         text = text.strip()
 
+        # Fix common LLM JSON mistakes
+        # 1. \' (unescaped apostrophe) → '
+        text = text.replace("\\'", "'")
+
         # Try lenient parse first (handles literal newlines in strings)
         try:
             decoder = json.JSONDecoder(strict=False)
