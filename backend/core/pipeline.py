@@ -1,4 +1,5 @@
 import json
+import time
 from agents.idea_agent import IdeaAgent
 from agents.script_agent import ScriptAgent
 from agents.visual_agent import VisualAgent
@@ -33,6 +34,7 @@ class PipelineRunner:
                 output = result.get("output", {})
                 if isinstance(output, dict):
                     inputs.update(self._flatten_output(output, agent.name))
+                time.sleep(6)  # cooldown for free tier rate limits
             except Exception as e:
                 raise PipelineError(agent.name, str(e))
 

@@ -34,7 +34,7 @@ export default function APIKeyForm() {
         Keys are stored locally in your SQLite database. Only free-tier keys needed.
       </p>
 
-      {(["gemini", "grok", "cerebras"] as const).map((p) => (
+      {(["gemini", "groq", "cerebras"] as const).map((p) => (
         <label key={p} style={styles.label}>
           <span style={styles.providerName}>
             {p.charAt(0).toUpperCase() + p.slice(1)} API Key
