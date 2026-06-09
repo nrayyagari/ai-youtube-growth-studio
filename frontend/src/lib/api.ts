@@ -117,4 +117,10 @@ export const api = {
     request(`/api/youtube/learn/${channelId}`),
   linkPackageToVideo: (videoId: string, packageId: number) =>
     request(`/api/youtube/link-package?video_id=${videoId}&package_id=${packageId}`, { method: "POST" }),
+
+  // SaaS account and billing
+  getMe: () => request("/api/user/me"),
+  getUsage: () => request("/api/user/usage"),
+  createCheckout: (tier: string) =>
+    request("/api/stripe/checkout", { method: "POST", body: JSON.stringify({ tier }) }),
 };

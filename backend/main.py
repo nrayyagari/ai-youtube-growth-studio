@@ -24,6 +24,7 @@ from routes.thumbnails import router as thumbnails_router
 from routes.ab_test import router as ab_test_router
 from routes.youtube import router as youtube_router
 from routes.settings import router as settings_router
+from routes.monetization import router as monetization_router
 
 
 @asynccontextmanager
@@ -58,6 +59,7 @@ app.include_router(thumbnails_router)
 app.include_router(ab_test_router)
 app.include_router(youtube_router)
 app.include_router(settings_router)
+app.include_router(monetization_router)
 
 
 @app.get("/api/health")
@@ -93,16 +95,16 @@ def _seed_data():
         return
 
     conn.execute(
-        "INSERT INTO channels (name, niche, audience, target_country, language, content_mode, monetization_goal) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("CurioLab", "General Knowledge / Curiosity", "18-35 curious minds", "United States", "en", "single_video", "Ad revenue"),
+        "INSERT INTO channels (user_id, name, niche, audience, target_country, language, content_mode, monetization_goal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("local-dev-user", "CurioLab", "General Knowledge / Curiosity", "18-35 curious minds", "United States", "en", "single_video", "Ad revenue"),
     )
     conn.execute(
-        "INSERT INTO channels (name, niche, audience, target_country, language, content_mode, monetization_goal) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("SmartExplainers", "AI & Tech Explainers", "20-40 tech-interested professionals", "United States", "en", "single_video", "Ad revenue + affiliate"),
+        "INSERT INTO channels (user_id, name, niche, audience, target_country, language, content_mode, monetization_goal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("local-dev-user", "SmartExplainers", "AI & Tech Explainers", "20-40 tech-interested professionals", "United States", "en", "single_video", "Ad revenue + affiliate"),
     )
     conn.execute(
-        "INSERT INTO channels (name, niche, audience, target_country, language, content_mode, monetization_goal) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("ProductiveDaily", "Productivity & Self-Improvement", "22-35 professionals and students", "United States", "en", "single_video", "Ad revenue"),
+        "INSERT INTO channels (user_id, name, niche, audience, target_country, language, content_mode, monetization_goal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("local-dev-user", "ProductiveDaily", "Productivity & Self-Improvement", "22-35 professionals and students", "United States", "en", "single_video", "Ad revenue"),
     )
 
     workflows = [

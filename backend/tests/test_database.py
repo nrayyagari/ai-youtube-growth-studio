@@ -50,12 +50,14 @@ def test_init_db_creates_tables(db):
     assert "recommendations" in table_names
     assert "content_calendar" in table_names
     assert "publishing_slots" in table_names
+    assert "users" in table_names
+    assert "subscriptions" in table_names
 
 
 def test_channel_crud(db):
     cursor = db.execute(
-        "INSERT INTO channels (name, niche, audience, language) VALUES (?, ?, ?, ?)",
-        ("TestChannel", "Tech", "Developers", "en"),
+        "INSERT INTO channels (user_id, name, niche, audience, language) VALUES (?, ?, ?, ?, ?)",
+        ("local-dev-user", "TestChannel", "Tech", "Developers", "en"),
     )
     channel_id = cursor.lastrowid
     db.commit()
@@ -63,6 +65,7 @@ def test_channel_crud(db):
     row = db.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
     assert row["name"] == "TestChannel"
     assert row["niche"] == "Tech"
+    assert row["user_id"] == "local-dev-user"
 
     db.execute("UPDATE channels SET niche = ? WHERE id = ?", ("UpdatedTech", channel_id))
     db.commit()

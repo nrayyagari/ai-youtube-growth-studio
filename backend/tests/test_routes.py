@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     import os
-    os.chdir("/home/laborant/repos/ai-youtube-growth-studio/backend")
+    os.chdir(Path(__file__).resolve().parents[1])
     test_db = Path("data") / "test_api_growth_studio.db"
     if test_db.exists():
         test_db.unlink()

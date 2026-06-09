@@ -19,6 +19,7 @@ def init_db():
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT DEFAULT 'local-dev-user',
             name TEXT NOT NULL,
             niche TEXT DEFAULT '',
             audience TEXT DEFAULT '',
@@ -28,6 +29,23 @@ def init_db():
             monetization_goal TEXT DEFAULT '',
             upload_frequency TEXT DEFAULT '',
             banned_topics TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT DEFAULT '',
+            subscription_tier TEXT DEFAULT 'free',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            stripe_subscription_id TEXT DEFAULT '',
+            stripe_customer_id TEXT DEFAULT '',
+            status TEXT DEFAULT 'inactive',
+            current_period_end TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -255,5 +273,17 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         );
     """)
+    _ensure_column(conn, "channels", "user_id", "TEXT DEFAULT 'local-dev-user'")
+    conn.execute(
+        "INSERT OR IGNORE INTO users (id, email, subscription_tier) VALUES (?, ?, ?)",
+        ("local-dev-user", "local@example.com", "agency"),
+    )
+    conn.execute("UPDATE channels SET user_id = 'local-dev-user' WHERE user_id IS NULL OR user_id = ''")
     conn.commit()
     conn.close()
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    columns = [row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")

@@ -21,14 +21,21 @@ import TTSPage from "./pages/TTSPage";
 import WhisperPage from "./pages/WhisperPage";
 import ChannelAnalytics from "./pages/ChannelAnalytics";
 import ThumbnailGenerator from "./pages/ThumbnailGenerator";
+import Landing from "./pages/Landing";
+import Pricing from "./pages/Pricing";
+import AuthRedirect from "./pages/AuthRedirect";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<AuthRedirect mode="login" />} />
+        <Route path="/signup" element={<AuthRedirect mode="signup" />} />
         <Route element={<ErrorBoundary><Layout /></ErrorBoundary>}>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/channels" element={<Channels />} />
           <Route path="/channels/:channelId/reference-videos" element={<ReferenceVideos />} />
           <Route path="/channels/:channelId/style-profiles" element={<StyleProfiles />} />

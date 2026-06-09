@@ -1,11 +1,12 @@
 import json
 from datetime import date, timedelta
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from core.database import get_db
 from core.router import AIProviderRouter, AllProvidersExhausted
 from core.pipeline import PipelineRunner, PipelineError
+from core.tenancy import get_current_user, require_channel_access, require_feature, require_package_capacity
 
 router = APIRouter(prefix="/api", tags=["calendar"])
 
@@ -130,12 +131,12 @@ def delete_publishing_slot(slot_id: int):
 
 
 @router.post("/generate/batch")
-def batch_generate(body: BatchGenerateRequest):
+def batch_generate(body: BatchGenerateRequest, request: Request):
     conn = get_db()
-    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (body.channel_id,)).fetchone()
-    if not channel:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    user = get_current_user(conn, request)
+    require_feature(user, "batch_generate")
+    require_package_capacity(conn, user, len(body.topics))
+    channel = require_channel_access(conn, body.channel_id, user)
     workflow = conn.execute("SELECT * FROM workflows WHERE id = ?", (body.workflow_id,)).fetchone()
     if not workflow:
         conn.close()

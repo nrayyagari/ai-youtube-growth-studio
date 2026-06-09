@@ -1,9 +1,10 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from core.database import get_db
 from core.router import AIProviderRouter
+from core.tenancy import get_current_user, require_channel_access, require_feature
 
 router = APIRouter(prefix="/api", tags=["patterns"])
 
@@ -25,12 +26,11 @@ class TrendingRequest(BaseModel):
 
 
 @router.post("/channels/{channel_id}/competitor-analysis")
-def run_competitor_analysis(channel_id: int, body: CompetitorAnalysisCreate):
+def run_competitor_analysis(channel_id: int, body: CompetitorAnalysisCreate, request: Request):
     conn = get_db()
-    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
-    if not channel:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    user = get_current_user(conn, request)
+    require_feature(user, "competitor_analysis")
+    channel = require_channel_access(conn, channel_id, user)
     conn.close()
 
     try:

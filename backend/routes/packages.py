@@ -1,12 +1,13 @@
 import json
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 
 from core.database import get_db
 from core.router import AIProviderRouter, AllProvidersExhausted
 from core.pipeline import PipelineRunner, PipelineError
+from core.tenancy import get_current_user, require_channel_access, require_package_access, require_package_capacity
 
 router = APIRouter(prefix="/api", tags=["packages"])
 
@@ -31,12 +32,11 @@ class ApproveRequest(BaseModel):
 
 
 @router.post("/generate")
-def generate_package(body: GenerateRequest):
+def generate_package(body: GenerateRequest, request: Request):
     conn = get_db()
-    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (body.channel_id,)).fetchone()
-    if not channel:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    user = get_current_user(conn, request)
+    channel = require_channel_access(conn, body.channel_id, user)
+    require_package_capacity(conn, user)
     workflow = conn.execute("SELECT * FROM workflows WHERE id = ?", (body.workflow_id,)).fetchone()
     if not workflow:
         conn.close()
@@ -101,17 +101,12 @@ def generate_package(body: GenerateRequest):
 
 
 @router.post("/packages/{package_id}/regenerate")
-def regenerate_package(package_id: int, body: RegenerateRequest | None = None):
+def regenerate_package(package_id: int, request: Request, body: RegenerateRequest | None = None):
     conn = get_db()
-    package = conn.execute("SELECT * FROM video_packages WHERE id = ?", (package_id,)).fetchone()
-    if not package:
-        conn.close()
-        raise HTTPException(404, "Package not found")
+    user = get_current_user(conn, request)
+    package = require_package_access(conn, package_id, user)
 
-    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (package["channel_id"],)).fetchone()
-    if not channel:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    channel = require_channel_access(conn, package["channel_id"], user)
 
     sections_to_regenerate = set(body.sections) if body and body.sections else None
     if sections_to_regenerate is None:
@@ -213,12 +208,10 @@ def regenerate_package(package_id: int, body: RegenerateRequest | None = None):
 
 
 @router.post("/packages/{package_id}/approve")
-def approve_package(package_id: int, body: ApproveRequest | None = None):
+def approve_package(package_id: int, request: Request, body: ApproveRequest | None = None):
     conn = get_db()
-    package = conn.execute("SELECT * FROM video_packages WHERE id = ?", (package_id,)).fetchone()
-    if not package:
-        conn.close()
-        raise HTTPException(404, "Package not found")
+    user = get_current_user(conn, request)
+    require_package_access(conn, package_id, user)
 
     if body and body.override:
         conn.execute("UPDATE video_packages SET status = 'APPROVED' WHERE id = ?", (package_id,))
@@ -242,11 +235,12 @@ def approve_package(package_id: int, body: ApproveRequest | None = None):
 
 
 @router.get("/packages")
-def list_packages(channel_id: int | None = None, status: str | None = None):
+def list_packages(request: Request, channel_id: int | None = None, status: str | None = None):
     conn = get_db()
-    query = "SELECT * FROM video_packages"
-    params = []
-    conditions = []
+    user = get_current_user(conn, request)
+    query = "SELECT vp.* FROM video_packages vp JOIN channels c ON c.id = vp.channel_id"
+    params = [user.id]
+    conditions = ["c.user_id = ?"]
     if channel_id is not None:
         conditions.append("channel_id = ?")
         params.append(channel_id)
@@ -262,12 +256,10 @@ def list_packages(channel_id: int | None = None, status: str | None = None):
 
 
 @router.get("/packages/{package_id}")
-def get_package(package_id: int):
+def get_package(package_id: int, request: Request):
     conn = get_db()
-    package = conn.execute("SELECT * FROM video_packages WHERE id = ?", (package_id,)).fetchone()
-    if not package:
-        conn.close()
-        raise HTTPException(404, "Package not found")
+    user = get_current_user(conn, request)
+    package = require_package_access(conn, package_id, user)
     sections = conn.execute(
         "SELECT * FROM package_sections WHERE package_id = ? ORDER BY id", (package_id,)
     ).fetchall()
@@ -287,8 +279,10 @@ def get_package(package_id: int):
 
 
 @router.delete("/packages/{package_id}")
-def delete_package(package_id: int):
+def delete_package(package_id: int, request: Request):
     conn = get_db()
+    user = get_current_user(conn, request)
+    require_package_access(conn, package_id, user)
     conn.execute("DELETE FROM video_packages WHERE id = ?", (package_id,))
     conn.commit()
     conn.close()
@@ -315,12 +309,11 @@ class StreamGenerateRequest(BaseModel):
 
 
 @router.post("/generate/stream")
-async def generate_package_stream(body: StreamGenerateRequest):
+async def generate_package_stream(body: StreamGenerateRequest, request: Request):
     conn = get_db()
-    channel = conn.execute("SELECT * FROM channels WHERE id = ?", (body.channel_id,)).fetchone()
-    if not channel:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    user = get_current_user(conn, request)
+    channel = require_channel_access(conn, body.channel_id, user)
+    require_package_capacity(conn, user)
     workflow = conn.execute("SELECT * FROM workflows WHERE id = ?", (body.workflow_id,)).fetchone()
     if not workflow:
         conn.close()
@@ -394,12 +387,10 @@ async def generate_package_stream(body: StreamGenerateRequest):
 
 
 @router.get("/packages/{package_id}/export")
-def export_package(package_id: int, format: str = "md"):
+def export_package(package_id: int, request: Request, format: str = "md"):
     conn = get_db()
-    package = conn.execute("SELECT * FROM video_packages WHERE id = ?", (package_id,)).fetchone()
-    if not package:
-        conn.close()
-        raise HTTPException(404, "Package not found")
+    user = get_current_user(conn, request)
+    package = require_package_access(conn, package_id, user)
 
     channel = conn.execute("SELECT id, name, niche, audience FROM channels WHERE id = ?",
                            (package["channel_id"],)).fetchone()

@@ -1,8 +1,9 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from core.database import get_db
+from core.tenancy import get_current_user, require_channel_access, require_channel_capacity
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
 
@@ -32,13 +33,15 @@ class ChannelUpdate(BaseModel):
 
 
 @router.post("")
-def create_channel(body: ChannelCreate):
+def create_channel(body: ChannelCreate, request: Request):
     conn = get_db()
+    user = get_current_user(conn, request)
+    require_channel_capacity(conn, user)
     cursor = conn.execute(
-        """INSERT INTO channels (name, niche, audience, target_country, language,
+        """INSERT INTO channels (user_id, name, niche, audience, target_country, language,
            content_mode, monetization_goal, upload_frequency, banned_topics)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (body.name, body.niche, body.audience, body.target_country, body.language,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user.id, body.name, body.niche, body.audience, body.target_country, body.language,
          body.content_mode, body.monetization_goal, body.upload_frequency, body.banned_topics),
     )
     conn.commit()
@@ -48,20 +51,19 @@ def create_channel(body: ChannelCreate):
 
 
 @router.get("")
-def list_channels():
+def list_channels(request: Request):
     conn = get_db()
-    rows = conn.execute("SELECT * FROM channels ORDER BY created_at DESC").fetchall()
+    user = get_current_user(conn, request)
+    rows = conn.execute("SELECT * FROM channels WHERE user_id = ? ORDER BY created_at DESC", (user.id,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
 @router.get("/{channel_id}")
-def get_channel(channel_id: int):
+def get_channel(channel_id: int, request: Request):
     conn = get_db()
-    row = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    user = get_current_user(conn, request)
+    row = require_channel_access(conn, channel_id, user)
     packages = conn.execute(
         "SELECT * FROM video_packages WHERE channel_id = ? ORDER BY created_at DESC", (channel_id,)
     ).fetchall()
@@ -72,25 +74,25 @@ def get_channel(channel_id: int):
 
 
 @router.put("/{channel_id}")
-def update_channel(channel_id: int, body: ChannelUpdate):
+def update_channel(channel_id: int, body: ChannelUpdate, request: Request):
     conn = get_db()
-    row = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(404, "Channel not found")
+    user = get_current_user(conn, request)
+    require_channel_access(conn, channel_id, user)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if updates:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        conn.execute(f"UPDATE channels SET {set_clause} WHERE id = ?", (*updates.values(), channel_id))
+        conn.execute(f"UPDATE channels SET {set_clause} WHERE id = ? AND user_id = ?", (*updates.values(), channel_id, user.id))
         conn.commit()
     conn.close()
     return {"status": "updated"}
 
 
 @router.delete("/{channel_id}")
-def delete_channel(channel_id: int):
+def delete_channel(channel_id: int, request: Request):
     conn = get_db()
-    conn.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
+    user = get_current_user(conn, request)
+    require_channel_access(conn, channel_id, user)
+    conn.execute("DELETE FROM channels WHERE id = ? AND user_id = ?", (channel_id, user.id))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
