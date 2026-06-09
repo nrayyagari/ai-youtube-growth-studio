@@ -28,7 +28,7 @@ export default function Pricing() {
         <Link to="/" style={styles.brand}>Growth Studio</Link>
         <div style={styles.navLinks}>
           {isAuthenticated ? (
-            <Link to="/dashboard" style={styles.primarySmall}>Dashboard</Link>
+            <Link to="/generate" style={styles.primarySmall}>Dashboard</Link>
           ) : (
             <>
               <Link to="/login" style={styles.navLink}>Log in</Link>

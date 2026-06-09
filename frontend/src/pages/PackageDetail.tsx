@@ -144,7 +144,7 @@ const sectionLabels: Record<string, string> = {
   music: "Music Suggestions",
   titles: "Titles & SEO",
   thumbnail: "Thumbnail Concepts",
-  qa_report: "QA Report",
+  qa_report: "Content Review",
 };
 
 function renderIdea(content: any) {

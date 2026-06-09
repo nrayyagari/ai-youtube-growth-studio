@@ -49,11 +49,23 @@ class AIProviderRouter:
             "endpoint": "https://api.cerebras.ai/v1/chat/completions",
             "db_key": "cerebras_api_key",
         },
+        "deepseek": {
+            "model": "deepseek-chat",
+            "rpm": 60,
+            "endpoint": "https://api.deepseek.com/v1/chat/completions",
+            "db_key": "deepseek_api_key",
+        },
+        "openai": {
+            "model": "gpt-4o-mini",
+            "rpm": 100,
+            "endpoint": "https://api.openai.com/v1/chat/completions",
+            "db_key": "openai_api_key",
+        },
     }
 
     def __init__(self):
         self.tracker = RateTracker()
-        self.ordering = ["gemini", "groq", "cerebras"]
+        self.ordering = ["gemini", "groq", "cerebras", "deepseek", "openai"]
 
     @property
     def min_interval(self) -> float:

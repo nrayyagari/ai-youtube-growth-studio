@@ -10,6 +10,8 @@ class APIKeysUpdate(BaseModel):
     gemini_api_key: str = ""
     grok_api_key: str = ""
     cerebras_api_key: str = ""
+    deepseek_api_key: str = ""
+    openai_api_key: str = ""
 
 
 @router.get("/apikeys")

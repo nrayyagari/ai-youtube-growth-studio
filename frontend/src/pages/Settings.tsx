@@ -1,170 +1,215 @@
 import { useState, useEffect } from "react";
-import APIKeyForm from "../components/forms/APIKeyForm";
+import { useAuth } from "../contexts/AuthContext";
+import { useChannels } from "../hooks/useApi";
+import { api } from "../lib/api";
+
+type Tab = "apikeys" | "channel" | "account" | "billing";
 
 export default function Settings() {
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [ytConnected, setYtConnected] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
+  const { user } = useAuth();
+  const { channels, loading } = useChannels();
+  const [tab, setTab] = useState<Tab>("apikeys");
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState("");
+  const [keyValues, setKeyValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
-  const redirectUri = `${window.location.origin}/api/youtube/oauth/callback`;
+  const [channelId, setChannelId] = useState("");
+  const [chName, setChName] = useState("");
+  const [niche, setNiche] = useState("");
+  const [audience, setAudience] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [frequency, setFrequency] = useState("");
+  const [monetization, setMonetization] = useState("");
+  const [savingChannel, setSavingChannel] = useState(false);
 
   useEffect(() => {
-    fetch("/api/youtube/oauth/status")
-      .then((r) => r.json())
-      .then((d) => setYtConnected(d.connected))
-      .catch(() => {});
+    api.getApiKeys().then(setKeys).catch(() => {});
   }, []);
 
-  const handleConnect = async () => {
-    if (!clientId.trim() || !clientSecret.trim()) {
-      setMsg("Enter Client ID and Client Secret");
-      return;
+  useEffect(() => {
+    if (!loading && channels.length > 0) {
+      const c = channels[0];
+      setChannelId(String(c.id));
+      setChName(c.name);
+      setNiche(c.niche);
+      setAudience(c.audience);
+      setLanguage(c.language);
+      setFrequency(c.upload_frequency);
+      setMonetization(c.monetization_goal);
     }
-    setLoading(true);
-    setMsg("");
+  }, [channels, loading]);
+
+  const handleSaveKeys = async () => {
+    setSaving(true);
+    setMessage("");
     try {
-      const res = await fetch("/api/youtube/oauth/url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-        }),
-      });
-      const data = await res.json();
-      if (data.auth_url) {
-        window.open(data.auth_url, "_blank");
-        setMsg("Complete OAuth in the opened window. Then click Refresh Status.");
-      }
-    } catch (err: any) {
-      setMsg("Error: " + err.message);
+      await api.updateApiKeys(keyValues);
+      const updated = await api.getApiKeys();
+      setKeys(updated);
+      setKeyValues({});
+      setMessage("API keys saved.");
+    } catch (e: any) {
+      setMessage(e.message);
+    } finally {
+      setSaving(false);
     }
-    setLoading(false);
   };
 
-  const checkStatus = async () => {
-    const res = await fetch("/api/youtube/oauth/status");
-    const data = await res.json();
-    setYtConnected(data.connected);
-    if (data.connected) setMsg("YouTube connected!");
+  const handleSaveChannel = async () => {
+    if (!channelId) return;
+    setSavingChannel(true);
+    setMessage("");
+    try {
+      await api.updateChannel(Number(channelId), {
+        name: chName, niche, audience, language,
+        upload_frequency: frequency, monetization_goal: monetization,
+      });
+      setMessage("Channel updated.");
+    } catch (e: any) {
+      setMessage(e.message);
+    } finally {
+      setSavingChannel(false);
+    }
   };
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "apikeys", label: "API Keys" },
+    { key: "channel", label: "Channel" },
+    { key: "account", label: "Account" },
+    { key: "billing", label: "Billing" },
+  ];
+
+  const aiProviders = [
+    { key: "gemini_api_key", label: "Gemini API Key", hint: "Gemini 2.0 Flash — 15 RPM free" },
+    { key: "grok_api_key", label: "Groq API Key", hint: "Llama 3.3 70B — 30 RPM free" },
+    { key: "cerebras_api_key", label: "Cerebras API Key", hint: "Llama 3.3 70B — 30 RPM free" },
+    { key: "deepseek_api_key", label: "DeepSeek API Key", hint: "DeepSeek V3 — ~$0.27/M tokens" },
+    { key: "openai_api_key", label: "OpenAI API Key", hint: "GPT-4o-mini — small free credits" },
+  ];
 
   return (
-    <div>
-      <h1 style={{ fontSize: 24, color: "#fff", marginBottom: 24 }}>Settings</h1>
+    <div style={styles.page}>
+      <h1 style={styles.h1}>Settings</h1>
 
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>AI API Keys</h2>
-        <APIKeyForm />
+      <div style={styles.tabBar}>
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={tab === t.key ? styles.tabActive : styles.tab}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>YouTube Analytics OAuth</h2>
-        <p style={styles.help}>
-          Create a Google Cloud Project, enable YouTube Analytics API + YouTube Data API v3,
-          create an OAuth 2.0 Web Application credential. Add this exact redirect URI:
-          <code style={styles.code}>
-            {redirectUri}
-          </code>
-        </p>
-        <div style={styles.status}>
-          Status:{" "}
-          <span style={{ color: ytConnected ? "#4ade80" : "#f87171", fontWeight: 600 }}>
-            {ytConnected ? "Connected" : "Not Connected"}
-          </span>
-        </div>
+      {message && <p style={message.includes("saved") || message.includes("updated") ? styles.success : styles.error}>{message}</p>}
 
-        <div style={styles.form}>
-          <label style={styles.label}>
-            Client ID
-            <input
-              type="text"
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="xxx.apps.googleusercontent.com"
-              style={styles.input}
-            />
-          </label>
-          <label style={styles.label}>
-            Client Secret
-            <input
-              type="password"
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              placeholder="GOCSPX-..."
-              style={styles.input}
-            />
-          </label>
-          <div style={styles.buttons}>
-            <button onClick={handleConnect} disabled={loading} style={styles.btn}>
-              {loading ? "Opening..." : "Connect YouTube"}
-            </button>
-            <button onClick={checkStatus} style={styles.btnOutline}>
-              Refresh Status
-            </button>
+      {tab === "apikeys" && (
+        <div>
+          <h2 style={styles.h2}>🧠 AI Text</h2>
+          <p style={styles.hint}>At least one provider required.</p>
+          {aiProviders.map((p) => (
+            <div key={p.key} style={styles.keyRow}>
+              <label style={styles.keyLabel}>
+                {p.label}
+                <span style={styles.keyHint}>{p.hint}</span>
+              </label>
+              <input
+                type="password"
+                placeholder={keys[p.key] ? "•••• configured" : "Enter key"}
+                value={keyValues[p.key] ?? ""}
+                onChange={(e) => setKeyValues({ ...keyValues, [p.key]: e.target.value })}
+                style={styles.input}
+              />
+            </div>
+          ))}
+          <h2 style={{ ...styles.h2, marginTop: 28 }}>📊 YouTube</h2>
+          <p style={styles.hint}>Connect your channel — real analytics data makes scripts better.</p>
+          <button disabled style={{ ...styles.primaryBtn, opacity: 0.5 }}>Connect YouTube (coming soon)</button>
+
+          <button onClick={handleSaveKeys} disabled={saving} style={styles.primaryBtn}>
+            {saving ? "Saving..." : "Save API Keys"}
+          </button>
+        </div>
+      )}
+
+      {tab === "channel" && (
+        <div>
+          <h2 style={styles.h2}>Channel Settings</h2>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Name</label>
+            <input value={chName} onChange={(e) => setChName(e.target.value)} style={styles.input} />
           </div>
-          {msg && (
-            <p style={{ color: msg.includes("Error") ? "#f87171" : "#4ade80", fontSize: 13, marginTop: 8 }}>
-              {msg}
-            </p>
-          )}
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Niche</label>
+            <input value={niche} onChange={(e) => setNiche(e.target.value)} style={styles.input} />
+          </div>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Audience</label>
+            <input value={audience} onChange={(e) => setAudience(e.target.value)} style={styles.input} />
+          </div>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Language</label>
+            <input value={language} onChange={(e) => setLanguage(e.target.value)} style={styles.input} />
+          </div>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Upload Frequency</label>
+            <input value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder="Weekly, Daily..." style={styles.input} />
+          </div>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Monetization Goal</label>
+            <input value={monetization} onChange={(e) => setMonetization(e.target.value)} placeholder="Ad revenue" style={styles.input} />
+          </div>
+          <button onClick={handleSaveChannel} disabled={savingChannel} style={styles.primaryBtn}>
+            {savingChannel ? "Saving..." : "Save Channel"}
+          </button>
         </div>
-      </div>
+      )}
+
+      {tab === "account" && (
+        <div>
+          <h2 style={styles.h2}>Account</h2>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Email</label>
+            <input value={user?.email || ""} disabled style={{ ...styles.input, opacity: 0.5 }} />
+          </div>
+          <div style={styles.keyRow}>
+            <label style={styles.keyLabel}>Plan</label>
+            <input value={(user?.subscription_tier || "free").toUpperCase()} disabled style={{ ...styles.input, opacity: 0.5 }} />
+          </div>
+          <p style={styles.hint}>
+            {user?.subscription_tier === "free"
+              ? "Upgrade to Pro for unlimited packages."
+              : `You're on the ${user?.subscription_tier} plan.`}
+          </p>
+        </div>
+      )}
+
+      {tab === "billing" && (
+        <div>
+          <h2 style={styles.h2}>Billing</h2>
+          <p style={styles.hint}>Payment method and invoice history will appear here when checkout is configured.</p>
+        </div>
+      )}
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  section: {
-    background: "#1e1e2e",
-    borderRadius: 8,
-    padding: "20px 24px",
-    border: "1px solid #333",
-    marginBottom: 20,
-    maxWidth: 700,
-  },
-  sectionTitle: { fontSize: 18, margin: "0 0 12px", color: "#ccc" },
-  help: { fontSize: 12, color: "#888", lineHeight: 1.6, marginBottom: 12 },
-  code: {
-    display: "block",
-    background: "#0f0f1a",
-    padding: "4px 8px",
-    borderRadius: 4,
-    fontSize: 11,
-    color: "#e94560",
-    marginTop: 4,
-  },
-  status: { fontSize: 14, marginBottom: 16, color: "#aaa" },
-  form: { display: "flex", flexDirection: "column", gap: 12 },
-  label: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#888" },
-  input: {
-    padding: "10px 14px",
-    borderRadius: 6,
-    border: "1px solid #444",
-    background: "#0f0f1a",
-    color: "#eee",
-    fontSize: 14,
-  },
-  buttons: { display: "flex", gap: 10, marginTop: 8 },
-  btn: {
-    padding: "10px 20px",
-    borderRadius: 6,
-    border: "none",
-    background: "#e94560",
-    color: "#fff",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  btnOutline: {
-    padding: "10px 20px",
-    borderRadius: 6,
-    border: "1px solid #e94560",
-    background: "transparent",
-    color: "#e94560",
-    cursor: "pointer",
-    fontSize: 14,
-  },
+  page: { maxWidth: 640, margin: "0 auto", padding: "40px 32px" },
+  h1: { fontSize: 28, color: "#fff", marginBottom: 24 },
+  h2: { fontSize: 18, color: "#ddd", marginBottom: 12 },
+  hint: { color: "#777", fontSize: 13, marginBottom: 16 },
+  tabBar: { display: "flex", gap: 0, marginBottom: 28, borderBottom: "1px solid #333" },
+  tab: { padding: "10px 18px", background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: 14, borderBottom: "2px solid transparent" },
+  tabActive: { padding: "10px 18px", background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14, borderBottom: "2px solid #e94560", fontWeight: 600 },
+  keyRow: { marginBottom: 16 },
+  keyLabel: { display: "block", color: "#ccc", fontSize: 13, fontWeight: 600, marginBottom: 4 },
+  keyHint: { display: "block", color: "#666", fontSize: 12, fontWeight: 400, marginTop: 2 },
+  input: { display: "block", width: "100%", padding: "10px 14px", borderRadius: 6, border: "1px solid #444", background: "#1e1e2e", color: "#eee", fontSize: 14, boxSizing: "border-box" },
+  primaryBtn: { marginTop: 16, padding: "12px 24px", borderRadius: 6, border: "none", background: "#e94560", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14 },
+  success: { color: "#4ade80", fontSize: 14, marginBottom: 12 },
+  error: { color: "#f87171", fontSize: 14, marginBottom: 12 },
 };

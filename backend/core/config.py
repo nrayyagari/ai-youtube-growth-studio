@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     grok_api_key: str = ""
     cerebras_api_key: str = ""
+    deepseek_api_key: str = ""
+    openai_api_key: str = ""
     frontend_origin: str = "http://localhost:5173"
     youtube_client_id: str = ""
     youtube_client_secret: str = ""

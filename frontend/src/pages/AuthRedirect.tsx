@@ -49,7 +49,7 @@ export default function AuthRedirect({ mode }: { mode: "login" | "signup" }) {
                 body: JSON.stringify({ type: "user.created", data: { id: userId } }),
               }).catch(() => {});
             }
-            navigate("/dashboard", { replace: true });
+            navigate("/generate", { replace: true });
           });
 
           setState("ready");
@@ -95,7 +95,7 @@ export default function AuthRedirect({ mode }: { mode: "login" | "signup" }) {
             ? "Clerk is not configured. When Clerk keys are set, authentication will be handled automatically."
             : "Redirecting to Clerk..."}
         </p>
-        <Link to="/dashboard" style={styles.button}>Continue to local app</Link>
+        <Link to="/generate" style={styles.button}>Continue to local app</Link>
       </div>
     </div>
   );
