@@ -7,7 +7,9 @@ class MusicAgent(BaseAgent):
 
     def process(self, channel: dict, inputs: dict, router: AIProviderRouter) -> dict:
         scene_plan = str(inputs.get("scene_plan", ""))
-        prompt = f"""You are a music director for faceless YouTube videos.
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
+        prompt = f"""{correction_prefix}You are a music director for faceless YouTube videos.
 
 Channel style: {channel.get('music_style', 'Modern background music')}
 Scene plan excerpt: {scene_plan[:2000] if len(scene_plan) > 2000 else scene_plan}

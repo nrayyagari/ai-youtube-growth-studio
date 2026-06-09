@@ -8,7 +8,9 @@ class ThumbnailAgent(BaseAgent):
     def process(self, channel: dict, inputs: dict, router: AIProviderRouter) -> dict:
         title = inputs.get("title", "")
         idea = inputs.get("idea", "")
-        prompt = f"""You are a YouTube thumbnail designer for faceless channels.
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
+        prompt = f"""{correction_prefix}You are a YouTube thumbnail designer for faceless channels.
 
 Video Title: {title}
 Topic: {idea}

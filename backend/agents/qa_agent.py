@@ -10,9 +10,11 @@ class QAAgent(BaseAgent):
         titles = str(inputs.get("titles", ""))
         thumbnail = str(inputs.get("thumbnail", ""))
         idea = str(inputs.get("idea", ""))
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
         banned_topics = channel.get("banned_topics", "[]")
 
-        prompt = f"""You are a QA auditor for YouTube content. Check for copyright, monetization, factual, and quality issues.
+        prompt = f"""{correction_prefix}You are a QA auditor for YouTube content. Check for copyright, monetization, factual, and quality issues.
 
 Channel banned topics: {banned_topics}
 

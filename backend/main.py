@@ -1,5 +1,6 @@
 import os
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +25,15 @@ from routes.ab_test import router as ab_test_router
 from routes.youtube import router as youtube_router
 from routes.settings import router as settings_router
 
-app = FastAPI(title="AI YouTube Growth Studio")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    _seed_data()
+    yield
+
+
+app = FastAPI(title="AI YouTube Growth Studio", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,10 +60,17 @@ app.include_router(youtube_router)
 app.include_router(settings_router)
 
 
-@app.on_event("startup")
-def startup():
-    init_db()
-    _seed_data()
+@app.get("/api/health")
+def health():
+    from core.database import get_db
+    try:
+        conn = get_db()
+        conn.execute("SELECT 1")
+        conn.close()
+        db_ok = True
+    except Exception:
+        db_ok = False
+    return {"status": "ok", "database": db_ok}
 
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

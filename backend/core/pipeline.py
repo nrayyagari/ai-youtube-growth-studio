@@ -25,10 +25,12 @@ class PipelineRunner:
         ]
 
     def run(self, channel: dict, topic: str = "", skip_sections: set[str] | None = None,
-            on_progress: Callable[[dict], None] | None = None) -> dict:
+            on_progress: Callable[[dict], None] | None = None,
+            correction_prompts: dict[str, str] | None = None) -> dict:
         results = []
         inputs = {"topic": topic}
         skip = skip_sections or set()
+        prompts = correction_prompts or {}
 
         for agent in self.agents:
             if agent.name in skip:
@@ -38,6 +40,8 @@ class PipelineRunner:
             if on_progress:
                 on_progress({"agent": agent.name, "status": "running"})
             try:
+                if agent.name in prompts:
+                    inputs["correction_prompt"] = prompts[agent.name]
                 result = agent.process(channel, inputs, self.router)
                 results.append(result)
                 output = result.get("output", {})
@@ -45,7 +49,7 @@ class PipelineRunner:
                     inputs.update(self._flatten_output(output, agent.name))
                 if on_progress:
                     on_progress({"agent": agent.name, "status": "done", "section_type": result.get("section_type")})
-                time.sleep(2)
+                time.sleep(self.router.min_interval)
             except Exception as e:
                 if on_progress:
                     on_progress({"agent": agent.name, "status": "error", "error": str(e)})
@@ -96,15 +100,36 @@ class PipelineRunner:
             "monetization": 85,
         }
 
+        category_agent = {
+            "growth_score": "idea",
+            "script_score": "script",
+            "retention": "script",
+            "monetization": "qa",
+            "title_score": "title",
+            "thumbnail_score": "thumbnail",
+            "copyright_safety": "qa",
+            "factual_accuracy": "qa",
+        }
+
         scores = self._extract_scores(results)
         failing = []
         corrections = []
+        correction_prompts = {}
 
         for category, threshold in thresholds.items():
             actual = scores.get(category, 0)
             if actual < threshold:
                 failing.append({"category": category, "score": actual, "required": threshold})
                 corrections.append(f"Improve {category}: currently {actual}, need {threshold}")
+                agent_name = category_agent.get(category, "")
+                if agent_name:
+                    existing = correction_prompts.get(agent_name, "")
+                    gap = threshold - actual
+                    hint = f"[FIX REQUIRED] {category} scored {actual}/100 (need {threshold}, missing {gap} points). "
+                    correction_prompts[agent_name] = existing + hint
+
+        for agent_name in correction_prompts:
+            correction_prompts[agent_name] += "Regenerate this section with a stronger focus on the failing categories. Maintain all other quality dimensions."
 
         status = "APPROVED" if not failing else "NEEDS_IMPROVEMENT"
         return {
@@ -112,6 +137,7 @@ class PipelineRunner:
             "scores": scores,
             "failing": failing,
             "corrections": corrections,
+            "correction_prompts": correction_prompts,
         }
 
     def _extract_scores(self, results: list[dict]) -> dict:
@@ -136,35 +162,61 @@ class PipelineRunner:
                     if isinstance(val, dict) and "score" in val:
                         key = "script_score" if cat == "script_quality" else cat
                         scores[key] = val["score"]
+            elif section_type in ("visual", "scene_plan"):
+                visual_score = output.get("score", {})
+                if isinstance(visual_score, dict):
+                    overall = visual_score.get("overall")
+                    if overall is None:
+                        vals = []
+                        for v in visual_score.values():
+                            if isinstance(v, dict) and "score" in v:
+                                vals.append(v["score"])
+                        overall = sum(vals) // len(vals) if vals else 0
+                    scores["visual_score"] = int(overall) if overall else 0
+                elif isinstance(visual_score, (int, float)):
+                    scores["visual_score"] = int(visual_score)
+                else:
+                    scores["visual_score"] = 0
             elif section_type == "titles":
                 scores["title_score"] = output.get("title_score", {}).get("score", 0)
                 scores["ctr_score"] = output.get("ctr_score", {}).get("score", 0)
             elif section_type == "thumbnail":
                 scores["thumbnail_score"] = output.get("score", {}).get("thumbnail_quality", {}).get("score", 0)
             elif section_type == "music":
-                music_score = output.get("score", {})
+                music_score = output.get("score", 0)
                 if isinstance(music_score, dict):
-                    overall = music_score.get("overall") or music_score.get("score")
+                    overall = music_score.get("overall") or music_score.get("score") or music_score.get("music_fit")
+                    if isinstance(overall, dict):
+                        overall = overall.get("score") or overall.get("overall")
                     if overall is None:
                         for v in music_score.values():
                             if isinstance(v, dict) and "score" in v:
                                 overall = v["score"]
                                 break
-                    scores["music_score"] = overall if overall is not None else 0
+                    scores["music_score"] = int(overall) if overall is not None else 0
+                elif isinstance(music_score, (int, float)):
+                    scores["music_score"] = int(music_score)
+                else:
+                    scores["music_score"] = 0
             elif section_type == "qa_report":
                 checks = output.get("checks", [])
                 qa_scores = []
                 for check in checks:
                     check_type = check.get("type", "")
+                    score = check.get("score", 0)
                     if check_type in ("copyright", "monetization"):
-                        scores[f"{check_type}_safety"] = check.get("score", 0)
+                        scores[f"{check_type}_safety"] = score
                     elif check_type == "factual":
-                        scores["factual_accuracy"] = check.get("score", 0)
+                        scores["factual_accuracy"] = score
                     else:
-                        scores[check_type] = check.get("score", 0)
-                    qa_scores.append(check.get("score", 0))
+                        scores[check_type] = score
+                    qa_scores.append(score)
                 if qa_scores:
                     scores["qa_overall"] = sum(qa_scores) // len(qa_scores)
+                elif output.get("overall_qa_score"):
+                    scores["qa_overall"] = int(output["overall_qa_score"])
+                else:
+                    scores["qa_overall"] = 0
 
         return scores
 

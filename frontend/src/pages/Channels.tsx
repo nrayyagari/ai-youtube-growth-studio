@@ -2,12 +2,14 @@ import { useChannels } from "../hooks/useApi";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import ChannelForm from "../components/forms/ChannelForm";
+import { LoadingState, ErrorMessage, EmptyState } from "../components/ui/ErrorBoundary";
 
 export default function Channels() {
-  const { channels, loading, create, remove } = useChannels();
+  const { channels, loading, error, reload, create, remove } = useChannels();
   const [showForm, setShowForm] = useState(false);
 
-  if (loading) return <p style={{ color: "#888" }}>Loading...</p>;
+  if (loading) return <LoadingState text="Loading channels..." />;
+  if (error) return <ErrorMessage message={error} onRetry={reload} />;
 
   return (
     <div>
@@ -30,7 +32,7 @@ export default function Channels() {
       )}
 
       {channels.length === 0 ? (
-        <p style={{ color: "#666" }}>No channels yet. Create one to get started.</p>
+        <EmptyState title="No Channels" description="Create one to get started." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 640 }}>
           {channels.map((ch) => (

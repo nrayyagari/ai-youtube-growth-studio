@@ -1,4 +1,5 @@
 import { useSkills } from "../hooks/useApi";
+import { LoadingState, EmptyState } from "../components/ui/ErrorBoundary";
 
 const CATEGORY_LABELS: Record<string, string> = {
   research: "Research",
@@ -12,7 +13,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function Skills() {
   const { skills, loading } = useSkills();
 
-  if (loading) return <p style={{ color: "#888" }}>Loading...</p>;
+  if (loading) return <LoadingState text="Loading skills..." />;
+
+  if (skills.length === 0) return <EmptyState title="No Skills" description="No skills registered yet." />;
 
   const grouped: Record<string, typeof skills> = {};
   skills.forEach((s) => {

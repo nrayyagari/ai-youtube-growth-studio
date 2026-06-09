@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import type { Channel, CalendarEntry, PublishingSlot, Workflow } from "../lib/types";
+import { LoadingState } from "../components/ui/ErrorBoundary";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 6);
@@ -12,6 +13,7 @@ export default function ContentCalendar() {
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [slots, setSlots] = useState<PublishingSlot[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"calendar" | "batch">("calendar");
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -24,8 +26,10 @@ export default function ContentCalendar() {
   const [newSlot, setNewSlot] = useState({ day: 1, hour: 9, label: "" });
 
   useEffect(() => {
-    api.listChannels().then(setChannels).catch(() => {});
-    api.listWorkflows().then(setWorkflows).catch(() => {});
+    Promise.all([
+      api.listChannels().then(setChannels),
+      api.listWorkflows().then(setWorkflows),
+    ]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -150,7 +154,9 @@ export default function ContentCalendar() {
                     const slot = slots.find((s) => s.label === e.slot_name);
                     return slot && slot.hour === h;
                   });
-                  return (
+  if (loading) return <LoadingState text="Loading calendar..." />;
+
+  return (
                     <div key={`${d.toISOString()}-${h}`} style={{ ...styles.cell, background: hourEntries.length > 0 ? "rgba(233,69,96,0.1)" : undefined }}>
                       {hourEntries.map((e) => (
                         <div key={e.id} style={{ fontSize: 10, color: "#e94560", padding: "2px 4px", borderRadius: 3, background: "rgba(233,69,96,0.2)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={e.notes || e.slot_name}>

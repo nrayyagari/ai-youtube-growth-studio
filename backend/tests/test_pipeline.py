@@ -30,7 +30,7 @@ def test_pipeline_section_order():
     pipeline = PipelineRunner(router)
     result = pipeline.run(SAMPLE_CHANNEL, "test")
     section_types = [s["section_type"] for s in result["sections"]]
-    assert section_types == ["idea", "script", "scene_plan", "music", "titles", "thumbnail", "qa_report"]
+    assert section_types == ["idea", "script", "visual", "music", "titles", "thumbnail", "qa_report"]
 
 
 def test_pipeline_skip_sections():
@@ -40,7 +40,7 @@ def test_pipeline_skip_sections():
     section_types = [s["section_type"] for s in result["sections"]]
     assert "idea" not in section_types
     assert "script" not in section_types
-    assert "scene_plan" not in section_types
+    assert "visual" not in section_types
     assert "music" in section_types
     assert router.call_count <= 4
 

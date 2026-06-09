@@ -272,6 +272,77 @@ class YouTubeAnalyticsService:
 
         return result
 
+    def get_video_metrics(self, video_id: str) -> dict:
+        _, _, build, _ = self._ensure_deps()
+        creds = self._get_credentials()
+
+        result = {}
+        youtube = build("youtube", "v3", credentials=creds)
+
+        try:
+            v_resp = youtube.videos().list(
+                part="statistics,snippet",
+                id=video_id,
+            ).execute()
+            if v_resp.get("items"):
+                item = v_resp["items"][0]
+                stats = item.get("statistics", {})
+                snippet = item.get("snippet", {})
+                result = {
+                    "video_id": video_id,
+                    "title": snippet.get("title", ""),
+                    "views": int(stats.get("viewCount", 0)),
+                    "likes": int(stats.get("likeCount", 0)),
+                    "comments": int(stats.get("commentCount", 0)),
+                    "published_at": snippet.get("publishedAt", ""),
+                }
+        except Exception:
+            result = {"video_id": video_id, "error": "stats unavailable"}
+
+        analytics = build("youtubeAnalytics", "v2", credentials=creds)
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=90)
+
+        try:
+            a_resp = analytics.reports().query(
+                ids="channel==MINE",
+                startDate=start_date.isoformat(),
+                endDate=end_date.isoformat(),
+                metrics="views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage",
+                dimensions="video",
+                filters=f"video=={video_id}",
+            ).execute()
+            rows = a_resp.get("rows", [])
+            if rows:
+                row = rows[0]
+                result["analytics_views"] = row[1]
+                result["watch_minutes"] = round(row[2], 1)
+                result["avg_duration_seconds"] = round(row[3], 1)
+                result["avg_view_pct"] = round(row[4], 1)
+        except Exception:
+            result["analytics_error"] = "video-level analytics unavailable"
+
+        try:
+            ctr_resp = analytics.reports().query(
+                ids="channel==MINE",
+                startDate=start_date.isoformat(),
+                endDate=end_date.isoformat(),
+                metrics="impressions,clicks",
+                dimensions="video",
+                filters=f"video=={video_id}",
+            ).execute()
+            ctr_rows = ctr_resp.get("rows", [])
+            if ctr_rows:
+                impressions = ctr_rows[0][1]
+                clicks = ctr_rows[0][2]
+                result["impressions"] = impressions
+                result["clicks"] = clicks
+                result["ctr"] = round((clicks / impressions * 100), 2) if impressions > 0 else 0
+        except Exception:
+            result["ctr"] = 0
+
+        return result
+
     def create_snapshot_from_analytics(self, channel_stats: dict, analytics: dict) -> dict:
         estimated_ctr = 5.0
         estimated_retention = analytics.get("avg_view_percentage", 50.0)

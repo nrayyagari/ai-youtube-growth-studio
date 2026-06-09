@@ -7,7 +7,9 @@ class IdeaAgent(BaseAgent):
 
     def process(self, channel: dict, inputs: dict, router: AIProviderRouter) -> dict:
         topic = inputs.get("topic", "")
-        prompt = f"""You are a YouTube content strategist for a faceless channel.
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
+        prompt = f"""{correction_prefix}You are a YouTube content strategist for a faceless channel.
 
 Channel profile:
 - Niche: {channel.get('niche', 'General')}

@@ -69,9 +69,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS video_packages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-            workflow_id INTEGER NOT NULL REFERENCES workflows(id),
+            workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
             status TEXT DEFAULT 'DRAFT',
-            source_package_id INTEGER REFERENCES video_packages(id) ON DELETE SET NULL,
+            youtube_video_id TEXT DEFAULT NULL,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -232,6 +232,26 @@ def init_db():
             image_path TEXT NOT NULL,
             prompt_used TEXT DEFAULT '',
             file_size_bytes INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS performance_learning (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            package_id INTEGER NOT NULL REFERENCES video_packages(id) ON DELETE CASCADE,
+            youtube_video_id TEXT NOT NULL,
+            predicted_growth_score REAL DEFAULT 0,
+            predicted_retention_score REAL DEFAULT 0,
+            predicted_ctr_score REAL DEFAULT 0,
+            actual_views INTEGER DEFAULT 0,
+            actual_watch_minutes REAL DEFAULT 0,
+            actual_ctr REAL DEFAULT 0,
+            actual_retention_pct REAL DEFAULT 0,
+            actual_likes INTEGER DEFAULT 0,
+            actual_comments INTEGER DEFAULT 0,
+            accuracy_score REAL DEFAULT 0,
+            learning_insights TEXT DEFAULT '[]',
+            snapshot_date TEXT NOT NULL,
             created_at TEXT DEFAULT (datetime('now'))
         );
     """)

@@ -7,7 +7,9 @@ class ScriptAgent(BaseAgent):
 
     def process(self, channel: dict, inputs: dict, router: AIProviderRouter) -> dict:
         idea = inputs.get("idea", "")
-        prompt = f"""You are a professional YouTube script writer for faceless channels.
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
+        prompt = f"""{correction_prefix}You are a professional YouTube script writer for faceless channels.
 
 Channel: {channel.get('name', '')}, Niche: {channel.get('niche', '')}
 Audience: {channel.get('audience', '')}, Language: {channel.get('language', 'en')}

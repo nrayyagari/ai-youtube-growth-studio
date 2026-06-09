@@ -1,9 +1,12 @@
 import { useWorkflows } from "../hooks/useApi";
+import { LoadingState, EmptyState } from "../components/ui/ErrorBoundary";
 
 export default function Workflows() {
   const { workflows, loading } = useWorkflows();
 
-  if (loading) return <p style={{ color: "#888" }}>Loading...</p>;
+  if (loading) return <LoadingState text="Loading workflows..." />;
+
+  if (workflows.length === 0) return <EmptyState title="No Workflows" description="No workflows configured yet." />;
 
   return (
     <div>

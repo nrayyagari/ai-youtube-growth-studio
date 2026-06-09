@@ -8,7 +8,9 @@ class TitleAgent(BaseAgent):
     def process(self, channel: dict, inputs: dict, router: AIProviderRouter) -> dict:
         idea = inputs.get("idea", "")
         script = str(inputs.get("script", ""))
-        prompt = f"""You are a YouTube title and SEO expert for faceless channels.
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
+        prompt = f"""{correction_prefix}You are a YouTube title and SEO expert for faceless channels.
 
 Idea: {idea}
 Script excerpt: {script[:2000] if len(script) > 2000 else script}

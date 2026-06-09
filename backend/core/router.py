@@ -55,6 +55,14 @@ class AIProviderRouter:
         self.tracker = RateTracker()
         self.ordering = ["gemini", "groq", "cerebras"]
 
+    @property
+    def min_interval(self) -> float:
+        lowest_rpm = min(
+            (cfg["rpm"] for cfg in self.PROVIDERS.values() if cfg["rpm"] is not None),
+            default=30,
+        )
+        return 60.0 / lowest_rpm
+
     def _get_db_keys(self, key_name: str) -> list[str]:
         from core.database import get_db
 

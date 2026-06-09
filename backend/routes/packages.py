@@ -132,10 +132,31 @@ def regenerate_package(package_id: int, body: RegenerateRequest | None = None):
     channel_dict = dict(channel)
     agent_skip = {SECTION_TO_AGENT.get(s, s) for s in passing}
 
+    correction_prompts = {}
+    if passing:
+        existing_sections_all = conn.execute(
+            "SELECT * FROM package_sections WHERE package_id = ?", (package_id,)
+        ).fetchall()
+        conn.close()
+        for s in existing_sections_all:
+            if s["section_type"] not in passing and s["score"] > 0:
+                agent_name = SECTION_TO_AGENT.get(s["section_type"], "")
+                if agent_name:
+                    gap = 85 - s["score"]
+                    correction_prompts[agent_name] = (
+                        f"[FIX REQUIRED] Previous {s['section_type']} scored {s['score']}/100 "
+                        f"(need 85, missing {gap} points). "
+                        f"Regenerate this section with a stronger focus on quality. "
+                        f"Maintain all other quality dimensions."
+                    )
+    else:
+        conn.close()
+
     try:
         router = AIProviderRouter()
         pipeline = PipelineRunner(router)
-        result = pipeline.run(channel_dict, "", skip_sections=agent_skip)
+        result = pipeline.run(channel_dict, "", skip_sections=agent_skip,
+                              correction_prompts=correction_prompts if correction_prompts else None)
     except PipelineError as e:
         raise HTTPException(500, f"Pipeline failed at {e.agent_name}: {e.detail}")
     except AllProvidersExhausted as e:
@@ -278,6 +299,7 @@ def _section_score(section_type: str, scores: dict) -> int:
     mapping = {
         "idea": "growth_score",
         "script": "script_score",
+        "visual": "visual_score",
         "titles": "title_score",
         "thumbnail": "thumbnail_score",
         "music": "music_score",

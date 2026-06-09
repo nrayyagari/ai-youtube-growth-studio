@@ -13,7 +13,7 @@ def test_visual_agent():
     agent = VisualAgent()
     router = MockRouter({"scenes": [{"scene": 1, "description": "Opening", "duration": 10}]})
     result = agent.process(SAMPLE_CHANNEL, {"topic": "AI"}, router)
-    assert result["section_type"] == "scene_plan"
+    assert result["section_type"] == "visual"
     assert "scenes" in result["output"]
 
 def test_music_agent():

@@ -7,7 +7,9 @@ class VisualAgent(BaseAgent):
 
     def process(self, channel: dict, inputs: dict, router: AIProviderRouter) -> dict:
         script = inputs.get("script", "")
-        prompt = f"""You are a visual director for faceless YouTube videos.
+        correction = inputs.get("correction_prompt", "")
+        correction_prefix = f"IMPORTANT CORRECTION INSTRUCTION: {correction}\n\n" if correction else ""
+        prompt = f"""{correction_prefix}You are a visual director for faceless YouTube videos.
 
 Channel visual style: {channel.get('visual_style', 'Clean and modern')}
 
@@ -43,4 +45,4 @@ Return a JSON object:
 Scores 0-100. Return ONLY valid JSON."""
         result = router.generate(prompt, temperature=0.7, max_tokens=4096)
         data = self._safe_json(result)
-        return {"output": data, "section_type": "scene_plan"}
+        return {"output": data, "section_type": "visual"}

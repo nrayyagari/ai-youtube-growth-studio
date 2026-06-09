@@ -109,4 +109,12 @@ export const api = {
     request(`/api/channels/${channelId}/recommendations/generate`, { method: "POST" }),
   listRecommendations: (channelId: number) =>
     request(`/api/channels/${channelId}/recommendations`),
+
+  // Performance Learning
+  learnFromPerformance: (packageId: number) =>
+    request(`/api/youtube/learn/${packageId}`, { method: "POST" }),
+  listLearningResults: (channelId: number) =>
+    request(`/api/youtube/learn/${channelId}`),
+  linkPackageToVideo: (videoId: string, packageId: number) =>
+    request(`/api/youtube/link-package?video_id=${videoId}&package_id=${packageId}`, { method: "POST" }),
 };

@@ -19,7 +19,6 @@ export default function ThumbnailGenerator() {
   const [images, setImages] = useState<ThumbnailImage[]>([]);
   const [generating, setGenerating] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [pkgDetail, setPkgDetail] = useState<any>(null);
 
   useEffect(() => {
     api.listPackages().then((data) => {
@@ -37,7 +36,6 @@ export default function ThumbnailGenerator() {
     setError("");
     try {
       const pkg = await api.getPackage(id);
-      setPkgDetail(pkg);
       const thumbSection = pkg.sections?.find((s: any) => s.section_type === "thumbnail");
       if (thumbSection) {
         try {

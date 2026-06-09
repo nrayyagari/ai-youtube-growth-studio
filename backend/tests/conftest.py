@@ -17,6 +17,8 @@ SAMPLE_CHANNEL = {
 
 
 class MockRouter:
+    min_interval = 0.0
+
     def __init__(self, response="{}"):
         if isinstance(response, str):
             self._response = response
@@ -28,6 +30,7 @@ class MockRouter:
 
 
 class FullMockRouter:
+    min_interval = 0.0
     def __init__(self):
         self.call_count = 0
 

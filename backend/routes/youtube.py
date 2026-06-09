@@ -17,6 +17,7 @@ class YouTubeUploadRequest(BaseModel):
     tags: list[str] = []
     privacy: str = "private"
     category_id: str = "27"
+    package_id: int | None = None
 
 
 class YouTubeOAuthConfig(BaseModel):
@@ -58,12 +59,38 @@ def upload_video_to_youtube(body: YouTubeUploadRequest):
     except Exception as e:
         raise HTTPException(500, f"Upload failed: {str(e)}")
 
+    if body.package_id:
+        conn = get_db()
+        conn.execute(
+            "UPDATE video_packages SET youtube_video_id = ? WHERE id = ?",
+            (video_id, body.package_id),
+        )
+        conn.commit()
+        conn.close()
+
     return {
         "youtube_video_id": video_id,
         "youtube_url": f"https://www.youtube.com/watch?v={video_id}",
         "privacy_status": body.privacy,
         "title": body.title,
+        "package_id": body.package_id,
     }
+
+
+@router.post("/link-package")
+def link_package_to_video(video_id: str, package_id: int):
+    conn = get_db()
+    package = conn.execute("SELECT * FROM video_packages WHERE id = ?", (package_id,)).fetchone()
+    if not package:
+        conn.close()
+        raise HTTPException(404, "Package not found")
+    conn.execute(
+        "UPDATE video_packages SET youtube_video_id = ? WHERE id = ?",
+        (video_id, package_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"package_id": package_id, "youtube_video_id": video_id}
 
 
 @router.post("/oauth/url")
@@ -313,6 +340,171 @@ def sync_youtube_to_snapshot(channel_id: int):
         raise
     except Exception as e:
         raise HTTPException(500, f"Sync failed: {str(e)}")
+
+
+@router.post("/learn/{package_id}")
+def learn_from_performance(package_id: int):
+    conn = get_db()
+    package = conn.execute("SELECT * FROM video_packages WHERE id = ?", (package_id,)).fetchone()
+    if not package:
+        conn.close()
+        raise HTTPException(404, "Package not found")
+
+    video_id = package["youtube_video_id"]
+    if not video_id:
+        conn.close()
+        raise HTTPException(400, "Package not linked to a YouTube video. Upload or link first.")
+
+    cid = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_id",)).fetchone()
+    secret = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_client_secret",)).fetchone()
+    token = conn.execute("SELECT value FROM settings WHERE key = ?", ("youtube_refresh_token",)).fetchone()
+    conn.close()
+
+    if not token or not token["value"]:
+        raise HTTPException(400, "YouTube not connected. Set up OAuth first.")
+
+    try:
+        svc = YouTubeAnalyticsService(
+            cid["value"] if cid else "",
+            secret["value"] if secret else "",
+            token["value"],
+        )
+        metrics = svc.get_video_metrics(video_id)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch video metrics: {str(e)}")
+
+    conn = get_db()
+    growth_scores = conn.execute(
+        "SELECT * FROM growth_scores WHERE package_id = ?", (package_id,)
+    ).fetchall()
+    sections = conn.execute(
+        "SELECT * FROM package_sections WHERE package_id = ?", (package_id,)
+    ).fetchall()
+    conn.close()
+
+    predicted_growth = 0
+    predicted_retention = 0
+    predicted_ctr = 0
+    for gs in growth_scores:
+        if gs["category"] == "retention":
+            predicted_retention = gs["score"]
+        if gs["category"] == "ctr":
+            predicted_ctr = gs["score"]
+        predicted_growth += gs["score"]
+    if growth_scores:
+        predicted_growth = predicted_growth // len(growth_scores)
+    if not predicted_retention:
+        for s in sections:
+            if s["section_type"] == "script" and s["score"] > 0:
+                predicted_retention = s["score"]
+    if not predicted_ctr:
+        for s in sections:
+            if s["section_type"] == "titles" and s["score"] > 0:
+                predicted_ctr = s["score"]
+
+    actual_views = metrics.get("views", 0)
+    actual_ctr = metrics.get("ctr", 0)
+    actual_retention = metrics.get("avg_view_pct", 0)
+    actual_watch = metrics.get("watch_minutes", 0)
+    actual_likes = metrics.get("likes", 0)
+    actual_comments = metrics.get("comments", 0)
+
+    predicted_ctr_norm = predicted_ctr / 100.0 if predicted_ctr > 0 else 0
+    predicted_retention_norm = predicted_retention / 100.0 if predicted_retention > 0 else 0
+
+    ctr_error = abs(predicted_ctr_norm - (actual_ctr / 100.0)) * 100
+    retention_error = abs(predicted_retention_norm - (actual_retention / 100.0)) * 100
+    accuracy = round(100 - ((ctr_error + retention_error) / 2), 1)
+
+    engagements = actual_likes + actual_comments
+    insights = []
+    if ctr_error > 30:
+        insights.append(f"CTR prediction off by {ctr_error:.0f}pts — title agent needs calibration")
+    if retention_error > 30:
+        insights.append(f"Retention prediction off by {retention_error:.0f}pts — script agent needs calibration")
+    if actual_views > 0 and engagements > 0 and actual_views / engagements < 100:
+        insights.append(f"Good engagement: {engagements} interactions on {actual_views} views")
+    if actual_views == 0:
+        insights.append("Video has no views yet — check back later for meaningful comparison")
+
+    today = datetime.date.today().isoformat()
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM performance_learning WHERE package_id = ? AND snapshot_date = ?",
+        (package_id, today),
+    ).fetchone()
+
+    if existing:
+        conn.execute(
+            """UPDATE performance_learning SET
+               predicted_growth_score = ?, predicted_retention_score = ?,
+               predicted_ctr_score = ?, actual_views = ?, actual_watch_minutes = ?,
+               actual_ctr = ?, actual_retention_pct = ?,
+               actual_likes = ?, actual_comments = ?,
+               accuracy_score = ?, learning_insights = ?
+               WHERE id = ?""",
+            (predicted_growth, predicted_retention, predicted_ctr,
+             actual_views, actual_watch, actual_ctr, actual_retention,
+             actual_likes, actual_comments,
+             accuracy, json.dumps(insights), existing["id"]),
+        )
+        learn_id = existing["id"]
+    else:
+        cursor = conn.execute(
+            """INSERT INTO performance_learning
+               (channel_id, package_id, youtube_video_id,
+                predicted_growth_score, predicted_retention_score, predicted_ctr_score,
+                actual_views, actual_watch_minutes, actual_ctr, actual_retention_pct,
+                actual_likes, actual_comments, accuracy_score, learning_insights, snapshot_date)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (package["channel_id"], package_id, video_id,
+             predicted_growth, predicted_retention, predicted_ctr,
+             actual_views, actual_watch, actual_ctr, actual_retention,
+             actual_likes, actual_comments, accuracy, json.dumps(insights), today),
+        )
+        learn_id = cursor.lastrowid
+
+    conn.commit()
+    row = conn.execute("SELECT * FROM performance_learning WHERE id = ?", (learn_id,)).fetchone()
+    conn.close()
+
+    return {
+        "learning_id": learn_id,
+        "package_id": package_id,
+        "youtube_video_id": video_id,
+        "predicted": {
+            "growth_score": predicted_growth,
+            "retention_score": predicted_retention,
+            "ctr_score": predicted_ctr,
+        },
+        "actual": {
+            "views": actual_views,
+            "watch_minutes": actual_watch,
+            "ctr_pct": actual_ctr,
+            "retention_pct": actual_retention,
+            "likes": actual_likes,
+            "comments": actual_comments,
+        },
+        "accuracy_score": accuracy,
+        "insights": insights,
+        "video_metrics": metrics,
+    }
+
+
+@router.get("/learn/{channel_id}")
+def list_learning_results(channel_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM performance_learning WHERE channel_id = ? ORDER BY created_at DESC",
+        (channel_id,),
+    ).fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["learning_insights"] = json.loads(d.get("learning_insights", "[]"))
+        results.append(d)
+    return results
 
 
 def _oauth_page(title: str, message: str, success: bool) -> str:

@@ -11,9 +11,6 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  if (loading) return <LoadingState text="Loading dashboard..." />;
-  if (error) return <ErrorMessage message={error} onRetry={reload} />;
-
   const filtered = useMemo(() => {
     return packages.filter((p) => {
       if (statusFilter && p.status !== statusFilter) return false;
@@ -31,6 +28,9 @@ export default function Dashboard() {
       return true;
     });
   }, [packages, search, statusFilter]);
+
+  if (loading) return <LoadingState text="Loading dashboard..." />;
+  if (error) return <ErrorMessage message={error} onRetry={reload} />;
 
   const approved = packages.filter((p) => p.status === "APPROVED");
   const needsWork = packages.filter((p) => p.status === "NEEDS_IMPROVEMENT");
