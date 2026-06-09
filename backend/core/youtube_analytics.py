@@ -23,8 +23,8 @@ class YouTubeAnalyticsService:
             from google.oauth2.credentials import Credentials
             from google.auth.transport.requests import Request
             from googleapiclient.discovery import build
-            from google_auth_oauthlib.flow import InstalledAppFlow
-            return Credentials, Request, build, InstalledAppFlow
+            from google_auth_oauthlib.flow import Flow
+            return Credentials, Request, build, Flow
         except ImportError:
             raise ImportError(
                 "YouTube Analytics requires: pip install google-api-python-client "
@@ -59,11 +59,11 @@ class YouTubeAnalyticsService:
 
     @staticmethod
     def get_auth_url(client_id: str, client_secret: str, redirect_uri: str) -> str:
-        _, _, _, InstalledAppFlow = YouTubeAnalyticsService._ensure_deps()
+        _, _, _, Flow = YouTubeAnalyticsService._ensure_deps()
 
-        flow = InstalledAppFlow.from_client_config(
+        flow = Flow.from_client_config(
             {
-                "installed": {
+                "web": {
                     "client_id": client_id,
                     "client_secret": client_secret,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -83,11 +83,11 @@ class YouTubeAnalyticsService:
 
     @staticmethod
     def exchange_code(client_id: str, client_secret: str, redirect_uri: str, code: str) -> dict:
-        _, _, _, InstalledAppFlow = YouTubeAnalyticsService._ensure_deps()
+        _, _, _, Flow = YouTubeAnalyticsService._ensure_deps()
 
-        flow = InstalledAppFlow.from_client_config(
+        flow = Flow.from_client_config(
             {
-                "installed": {
+                "web": {
                     "client_id": client_id,
                     "client_secret": client_secret,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
