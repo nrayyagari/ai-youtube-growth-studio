@@ -99,7 +99,7 @@ async def get_youtube_oauth_url(body: YouTubeOAuthConfig, req: Request):
         redirect_uri = body.redirect_uri
     else:
         origin = req.headers.get("origin") or req.headers.get("referer") or ""
-        if origin and "://" in origin and "trycloudflare" not in origin:
+        if origin and "://" in origin:
             base = origin.rstrip("/")
             redirect_uri = f"{base}/api/youtube/oauth/callback"
         else:
