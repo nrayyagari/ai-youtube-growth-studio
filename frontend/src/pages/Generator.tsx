@@ -76,7 +76,7 @@ export default function Generator() {
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.h1}>Create a video</h1>
+      <h1 style={styles.h1}>Generate Script</h1>
 
       <label style={styles.label}>Channel</label>
       {showNewChannel ? (
@@ -123,7 +123,7 @@ export default function Generator() {
       />
 
       <button onClick={handleGenerate} disabled={generating || !selectedChannel} style={generating ? styles.generateBtnDisabled : styles.generateBtn}>
-        {generating ? "Generating..." : "Generate Video →"}
+        {generating ? "Generating..." : "Generate Script →"}
       </button>
 
       {generating && <p style={styles.progress}>Writing script... Planning scenes... Generating titles... Running quality checks...</p>}

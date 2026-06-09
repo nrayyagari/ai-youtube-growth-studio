@@ -3,7 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const links = [
   { to: "/generate", label: "Generate" },
-  { to: "/my-videos", label: "My Videos" },
+  { to: "/my-videos", label: "My Scripts" },
   { to: "/settings", label: "Settings" },
 ];
 

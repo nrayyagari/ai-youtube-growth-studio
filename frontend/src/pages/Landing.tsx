@@ -19,10 +19,10 @@ export default function Landing() {
       </nav>
 
       <section style={styles.hero}>
-        <p style={styles.kicker}>AI-powered video planning</p>
+        <p style={styles.kicker}>AI-powered script generation</p>
         <h1 style={styles.h1}>Scripts that grow your channel — before you even record.</h1>
         <p style={styles.sub}>
-          Generate AI-optimized video scripts, titles, scene plans, and SEO — tailored to what actually works on your channel.
+          Generate AI-optimized scripts, titles, scene plans, and SEO — tailored to what actually works on your channel.
         </p>
         <div style={styles.actions}>
           <Link to="/signup" style={styles.primary}>Start free — no credit card</Link>
@@ -33,7 +33,7 @@ export default function Landing() {
         {[
           ["AI-powered scripts", "5 AI providers compete to write the best script for your topic."],
           ["Your channel data", "Connect YouTube and our analytics engine learns what works for your audience."],
-          ["3 free packages", "Generate up to 3 full video packages per month on the free plan."],
+          ["3 free scripts", "Generate up to 3 full script packages per month on the free plan."],
         ].map(([title, body]) => (
           <article key={title} style={styles.feature}>
             <h2 style={styles.h2}>{title}</h2>

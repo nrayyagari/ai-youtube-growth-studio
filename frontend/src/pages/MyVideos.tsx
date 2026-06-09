@@ -21,16 +21,16 @@ export default function MyVideos() {
     return true;
   });
 
-  if (loading) return <LoadingState text="Loading your videos..." />;
+  if (loading) return <LoadingState text="Loading your scripts..." />;
   if (error) return <ErrorMessage message={error} onRetry={reload} />;
 
   if (!packages || packages.length === 0) {
     return (
       <div style={styles.emptyPage}>
         <div style={styles.emptyCard}>
-          <h2 style={styles.emptyH2}>No videos yet</h2>
-          <p style={styles.emptyText}>Generate your first AI-powered video package.</p>
-          <Link to="/generate" style={styles.emptyBtn}>Generate your first video →</Link>
+          <h2 style={styles.emptyH2}>No scripts yet</h2>
+          <p style={styles.emptyText}>Generate your first AI-powered script package.</p>
+          <Link to="/generate" style={styles.emptyBtn}>Generate your first script →</Link>
         </div>
       </div>
     );
@@ -39,13 +39,13 @@ export default function MyVideos() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={styles.h1}>My Videos</h1>
+        <h1 style={styles.h1}>My Scripts</h1>
         <Link to="/generate" style={styles.generateBtn}>+ Generate New</Link>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
         <input
-          placeholder="Search videos..."
+          placeholder="Search scripts..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={styles.searchInput}
