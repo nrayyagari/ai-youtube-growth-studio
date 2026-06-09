@@ -1,6 +1,6 @@
 import json
 import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -94,8 +94,16 @@ def link_package_to_video(video_id: str, package_id: int):
 
 
 @router.post("/oauth/url")
-def get_youtube_oauth_url(body: YouTubeOAuthConfig):
-    redirect_uri = body.redirect_uri or settings.youtube_redirect_uri
+async def get_youtube_oauth_url(body: YouTubeOAuthConfig, req: Request):
+    if body.redirect_uri:
+        redirect_uri = body.redirect_uri
+    else:
+        origin = req.headers.get("origin") or req.headers.get("referer") or ""
+        if origin and "://" in origin and "trycloudflare" not in origin:
+            base = origin.rstrip("/")
+            redirect_uri = f"{base}/api/youtube/oauth/callback"
+        else:
+            redirect_uri = settings.youtube_redirect_uri
     if not body.client_id or not body.client_secret:
         raise HTTPException(400, "Client ID and Client Secret are required")
     try:

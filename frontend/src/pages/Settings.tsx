@@ -8,6 +8,15 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
+  const isTunnel = window.location.hostname.includes("trycloudflare.com");
+  const redirectUri = isTunnel
+    ? "http://localhost:8000/api/youtube/oauth/callback"
+    : `${window.location.origin}/api/youtube/oauth/callback`;
+
+  const displayRedirectUri = isTunnel
+    ? redirectUri
+    : `${window.location.origin}/api/youtube/oauth/callback`;
+
   useEffect(() => {
     fetch("/api/youtube/oauth/status")
       .then((r) => r.json())
@@ -23,7 +32,6 @@ export default function Settings() {
     setLoading(true);
     setMsg("");
     try {
-      const redirectUri = "http://localhost:8000/api/youtube/oauth/callback";
       const res = await fetch("/api/youtube/oauth/url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,7 +74,7 @@ export default function Settings() {
           Create a Google Cloud Project, enable YouTube Analytics API + YouTube Data API v3,
           create an OAuth 2.0 Web Application credential. Add this exact redirect URI:
           <code style={styles.code}>
-            http://localhost:8000/api/youtube/oauth/callback
+            {displayRedirectUri}
           </code>
         </p>
         <div style={styles.status}>
