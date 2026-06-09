@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import PaymentCheckout from "../components/checkout/PaymentCheckout";
 
@@ -11,12 +11,12 @@ const tiers = [
 
 export default function Pricing() {
   const { user, isAuthenticated } = useAuth();
-  const [message, setMessage] = useState("");
+  const navigate = useNavigate();
   const [checkoutTier, setCheckoutTier] = useState<string | null>(null);
 
   const handleCheckout = async (tier: string) => {
     if (tier === "free") {
-      setMessage("Free plan is active. Create an account to start.");
+      navigate("/signup");
       return;
     }
     setCheckoutTier(tier);
@@ -62,8 +62,6 @@ export default function Pricing() {
           </article>
         ))}
       </div>
-      {message && <p style={styles.message}>{message}</p>}
-
       {checkoutTier && (
         <PaymentCheckout tier={checkoutTier} onClose={() => setCheckoutTier(null)} />
       )}
@@ -89,5 +87,4 @@ const styles: Record<string, React.CSSProperties> = {
   list: { margin: 0, paddingLeft: 18, color: "#cfcfda", lineHeight: 1.9, flex: 1 },
   button: { border: "1px solid #55576b", background: "transparent", color: "#f4f4f5", padding: "11px 14px", borderRadius: 6, cursor: "pointer", fontWeight: 800 },
   primary: { border: "1px solid #e94560", background: "#e94560", color: "#fff", padding: "11px 14px", borderRadius: 6, cursor: "pointer", fontWeight: 800 },
-  message: { color: "#8fd3ff", margin: "0 32px 24px", overflowWrap: "anywhere", maxWidth: 1080, marginLeft: "auto", marginRight: "auto" },
 };

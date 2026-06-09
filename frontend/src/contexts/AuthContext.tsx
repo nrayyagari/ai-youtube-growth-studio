@@ -19,6 +19,9 @@ interface AuthContextValue {
   error: string | null;
   refetch: () => Promise<void>;
   isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -27,7 +30,22 @@ const AuthContext = createContext<AuthContextValue>({
   error: null,
   refetch: async () => {},
   isAuthenticated: false,
+  login: async () => {},
+  signup: async () => {},
+  logout: () => {},
 });
+
+function getToken(): string | null {
+  return localStorage.getItem("auth_token");
+}
+
+function setToken(token: string) {
+  localStorage.setItem("auth_token", token);
+}
+
+function clearToken() {
+  localStorage.removeItem("auth_token");
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserState | null>(null);
@@ -35,6 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchUser = async () => {
+    if (!getToken()) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -43,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load user");
       setUser(null);
+      clearToken();
     } finally {
       setLoading(false);
     }
@@ -52,6 +76,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, []);
 
+  const login = async (email: string, password: string) => {
+    const data = await api.login(email, password);
+    setToken(data.token);
+    await fetchUser();
+  };
+
+  const signup = async (email: string, password: string) => {
+    const data = await api.signup(email, password);
+    setToken(data.token);
+    await fetchUser();
+  };
+
+  const logout = () => {
+    clearToken();
+    setUser(null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -60,6 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         refetch: fetchUser,
         isAuthenticated: !!user,
+        login,
+        signup,
+        logout,
       }}
     >
       {children}

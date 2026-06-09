@@ -6,7 +6,8 @@ import PackageDetail from "./pages/PackageDetail";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
-import AuthRedirect from "./pages/AuthRedirect";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
@@ -34,8 +35,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
-      <Route path="/login" element={<AuthRedirect mode="login" />} />
-      <Route path="/signup" element={<AuthRedirect mode="signup" />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
       <Route element={<ErrorBoundary><Layout /></ErrorBoundary>}>
         <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />
         <Route path="/my-videos" element={<ProtectedRoute><MyVideos /></ProtectedRoute>} />

@@ -6,18 +6,11 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from core.config import settings
 from core.database import get_db
 from core.payment_router import payment_router
-from core.tenancy import ensure_user, get_current_user, usage_summary
+from core.tenancy import get_current_user, usage_summary
 
 router = APIRouter(prefix="/api", tags=["monetization"])
-
-
-class ClerkWebhook(BaseModel):
-    id: str | None = None
-    type: str = ""
-    data: dict = {}
 
 
 class CheckoutRequest(BaseModel):
@@ -47,28 +40,6 @@ def _upsert_subscription(conn, user_id: str, result: dict) -> None:
         ),
     )
     conn.commit()
-
-
-@router.post("/auth/webhook")
-def clerk_webhook(body: ClerkWebhook):
-    data = body.data or {}
-    user_id = data.get("id") or body.id
-    if not user_id:
-        return {"status": "ignored", "reason": "missing user id"}
-
-    email = ""
-    emails = data.get("email_addresses") or []
-    if emails:
-        email = emails[0].get("email_address", "")
-    email = data.get("email") or email
-
-    conn = get_db()
-    ensure_user(conn, user_id, email)
-    if email:
-        conn.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
-        conn.commit()
-    conn.close()
-    return {"status": "ok", "user_id": user_id}
 
 
 @router.get("/user/me")

@@ -8,7 +8,7 @@ const links = [
 ];
 
 export default function Sidebar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <aside style={styles.aside}>
@@ -38,7 +38,7 @@ export default function Sidebar() {
       </nav>
       <div style={styles.footer}>
         <Link to="/pricing" style={styles.footerLink}>Upgrade</Link>
-        <Link to="/" style={styles.footerLink}>Home</Link>
+        <button onClick={logout} style={styles.logoutBtn}>Logout</button>
       </div>
     </aside>
   );
@@ -58,4 +58,5 @@ const styles: Record<string, React.CSSProperties> = {
   active: { background: "#16213e", color: "#fff", borderRight: "3px solid #e94560" },
   footer: { display: "flex", justifyContent: "space-between", padding: "12px 20px", borderTop: "1px solid #333", marginTop: 8 },
   footerLink: { color: "#777", textDecoration: "none", fontSize: 13 },
+  logoutBtn: { color: "#e94560", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 },
 };

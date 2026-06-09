@@ -9,11 +9,11 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     openai_api_key: str = ""
     frontend_origin: str = "http://localhost:5173"
+    jwt_secret: str = "change-me-in-production"
+    dev_mode: bool = True
     youtube_client_id: str = ""
     youtube_client_secret: str = ""
     youtube_redirect_uri: str = "http://localhost:8000/api/youtube/oauth/callback"
-    clerk_webhook_secret: str = ""
-    clerk_publishable_key: str = ""
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_pro_price_id: str = ""

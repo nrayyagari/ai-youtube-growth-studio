@@ -32,7 +32,7 @@ def client():
 def test_user_me_creates_free_clerk_user(client):
     response = client.get(
         "/api/user/me",
-        headers={"X-Clerk-User-Id": "user_123", "X-Clerk-User-Email": "creator@example.com"},
+        headers={"X-User-Id": "user_123", "X-User-Email": "creator@example.com"},
     )
 
     assert response.status_code == 200
@@ -44,7 +44,7 @@ def test_user_me_creates_free_clerk_user(client):
 
 
 def test_free_user_channel_limit_is_enforced(client):
-    headers = {"X-Clerk-User-Id": "free_user"}
+    headers = {"X-User-Id": "free_user"}
 
     first = client.post("/api/channels", json={"name": "First"}, headers=headers)
     second = client.post("/api/channels", json={"name": "Second"}, headers=headers)
@@ -55,10 +55,10 @@ def test_free_user_channel_limit_is_enforced(client):
 
 
 def test_channels_are_scoped_to_current_user(client):
-    client.post("/api/channels", json={"name": "User A Channel"}, headers={"X-Clerk-User-Id": "user_a"})
-    client.post("/api/channels", json={"name": "User B Channel"}, headers={"X-Clerk-User-Id": "user_b"})
+    client.post("/api/channels", json={"name": "User A Channel"}, headers={"X-User-Id": "user_a"})
+    client.post("/api/channels", json={"name": "User B Channel"}, headers={"X-User-Id": "user_b"})
 
-    response = client.get("/api/channels", headers={"X-Clerk-User-Id": "user_a"})
+    response = client.get("/api/channels", headers={"X-User-Id": "user_a"})
 
     assert response.status_code == 200
     channels = response.json()
@@ -69,7 +69,7 @@ def test_checkout_returns_mock_until_stripe_is_configured(client):
     response = client.post(
         "/api/stripe/checkout",
         json={"tier": "pro"},
-        headers={"X-Clerk-User-Id": "user_checkout"},
+        headers={"X-User-Id": "user_checkout"},
     )
 
     assert response.status_code == 200
@@ -81,7 +81,7 @@ def test_payment_create_order_rejects_unknown_provider(client):
     response = client.post(
         "/api/payment/create-order",
         json={"tier": "pro", "provider": "bitcoin"},
-        headers={"X-Clerk-User-Id": "user_unknown"},
+        headers={"X-User-Id": "user_unknown"},
     )
     assert response.status_code == 400
 
@@ -89,7 +89,7 @@ def test_payment_create_order_rejects_unknown_provider(client):
 def test_payment_providers_list_returns_providers(client):
     response = client.get(
         "/api/payment/providers",
-        headers={"X-Clerk-User-Id": "user_providers"},
+        headers={"X-User-Id": "user_providers"},
     )
     assert response.status_code == 200
     assert isinstance(response.json(), list)

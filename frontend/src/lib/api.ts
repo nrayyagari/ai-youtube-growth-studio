@@ -1,8 +1,12 @@
 const API_BASE = "";
 
 async function request(path: string, options: RequestInit = {}) {
+  const token = localStorage.getItem("auth_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: { ...headers, ...(options.headers as Record<string, string> || {}) },
     ...options,
   });
   if (!res.ok) {
@@ -117,6 +121,12 @@ export const api = {
     request(`/api/youtube/learn/${channelId}`),
   linkPackageToVideo: (videoId: string, packageId: number) =>
     request(`/api/youtube/link-package?video_id=${videoId}&package_id=${packageId}`, { method: "POST" }),
+
+  // Auth
+  signup: (email: string, password: string) =>
+    request("/api/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
+  login: (email: string, password: string) =>
+    request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
 
   // SaaS account and billing
   getMe: () => request("/api/user/me"),

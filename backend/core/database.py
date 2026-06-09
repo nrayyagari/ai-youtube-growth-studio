@@ -276,6 +276,7 @@ def init_db():
     _ensure_column(conn, "channels", "user_id", "TEXT DEFAULT 'local-dev-user'")
     _ensure_column(conn, "subscriptions", "payment_provider", "TEXT DEFAULT 'stripe'")
     _ensure_column(conn, "subscriptions", "provider_subscription_id", "TEXT DEFAULT ''")
+    _ensure_column(conn, "users", "password_hash", "TEXT DEFAULT ''")
     conn.execute(
         "INSERT OR IGNORE INTO users (id, email, subscription_tier) VALUES (?, ?, ?)",
         ("local-dev-user", "local@example.com", "agency"),

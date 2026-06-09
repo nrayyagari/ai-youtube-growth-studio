@@ -25,6 +25,7 @@ from routes.ab_test import router as ab_test_router
 from routes.youtube import router as youtube_router
 from routes.settings import router as settings_router
 from routes.monetization import router as monetization_router
+from routes.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -60,6 +61,7 @@ app.include_router(ab_test_router)
 app.include_router(youtube_router)
 app.include_router(settings_router)
 app.include_router(monetization_router)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")

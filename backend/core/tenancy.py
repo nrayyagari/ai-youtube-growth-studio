@@ -6,6 +6,9 @@ from sqlite3 import Connection, Row
 
 from fastapi import HTTPException, Request
 
+from core.config import settings
+from core.auth import extract_user_id
+
 LOCAL_USER_ID = "local-dev-user"
 
 TIER_LIMITS = {
@@ -47,32 +50,34 @@ class CurrentUser:
         return TIER_LIMITS.get(self.subscription_tier, TIER_LIMITS["free"])
 
 
-def user_id_from_request(request: Request | None) -> str:
-    if request is None:
-        return LOCAL_USER_ID
-    return (
-        request.headers.get("X-Clerk-User-Id")
-        or request.headers.get("X-User-Id")
-        or LOCAL_USER_ID
-    )
-
-
 def ensure_user(conn: Connection, user_id: str, email: str = "") -> CurrentUser:
     row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if row:
         return _row_to_user(row)
 
-    tier = "agency" if user_id == LOCAL_USER_ID else "free"
+    if not user_id:
+        raise HTTPException(401, "Authentication required")
+
     conn.execute(
         "INSERT INTO users (id, email, subscription_tier) VALUES (?, ?, ?)",
-        (user_id, email, tier),
+        (user_id, email, "free"),
     )
     conn.commit()
-    return CurrentUser(id=user_id, email=email, subscription_tier=tier)
+    return CurrentUser(id=user_id, email=email, subscription_tier="free")
 
 
 def get_current_user(conn: Connection, request: Request | None) -> CurrentUser:
-    return ensure_user(conn, user_id_from_request(request), request.headers.get("X-Clerk-User-Email", "") if request else "")
+    user_id = extract_user_id(request) if request else LOCAL_USER_ID
+    if not user_id and not settings.dev_mode:
+        raise HTTPException(401, "Authentication required")
+    if not user_id:
+        user_id = LOCAL_USER_ID
+
+    email = ""
+    if request and request.headers.get("X-User-Email"):
+        email = request.headers["X-User-Email"]
+
+    return ensure_user(conn, user_id, email)
 
 
 def require_channel_access(conn: Connection, channel_id: int, user: CurrentUser) -> Row:
