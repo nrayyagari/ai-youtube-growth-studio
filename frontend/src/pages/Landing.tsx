@@ -1,14 +1,23 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Landing() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <div style={styles.page}>
       <nav style={styles.nav}>
         <div style={styles.brand}>Growth Studio</div>
         <div style={styles.navLinks}>
           <Link to="/pricing" style={styles.navLink}>Pricing</Link>
-          <Link to="/login" style={styles.navLink}>Log in</Link>
-          <Link to="/dashboard" style={styles.primarySmall}>Open app</Link>
+          {isAuthenticated ? (
+            <Link to="/dashboard" style={styles.primarySmall}>Dashboard</Link>
+          ) : (
+            <>
+              <Link to="/login" style={styles.navLink}>Log in</Link>
+              <Link to="/dashboard" style={styles.primarySmall}>Open app</Link>
+            </>
+          )}
         </div>
       </nav>
 

@@ -74,4 +74,40 @@ def test_checkout_returns_mock_until_stripe_is_configured(client):
 
     assert response.status_code == 200
     assert response.json()["status"] == "mock"
-    assert "tier=pro" in response.json()["checkout_url"]
+    assert response.json()["provider"] == "stripe"
+
+
+def test_payment_create_order_rejects_unknown_provider(client):
+    response = client.post(
+        "/api/payment/create-order",
+        json={"tier": "pro", "provider": "bitcoin"},
+        headers={"X-Clerk-User-Id": "user_unknown"},
+    )
+    assert response.status_code == 400
+
+
+def test_payment_providers_list_returns_providers(client):
+    response = client.get(
+        "/api/payment/providers",
+        headers={"X-Clerk-User-Id": "user_providers"},
+    )
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_razorpay_webhook_ignores_missing_signature(client):
+    response = client.post("/api/razorpay/webhook", json={"event": "unknown"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ignored"
+
+
+def test_paypal_webhook_ignores_unknown_event(client):
+    response = client.post("/api/paypal/webhook", json={"event_type": "UNKNOWN"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ignored"
+
+
+def test_stripe_webhook_ignores_unknown_event(client):
+    response = client.post("/api/stripe/webhook", json={"type": "unknown"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ignored"

@@ -121,6 +121,12 @@ export const api = {
   // SaaS account and billing
   getMe: () => request("/api/user/me"),
   getUsage: () => request("/api/user/usage"),
+  listPaymentProviders: () => request("/api/payment/providers"),
+  createPaymentOrder: (tier: string, provider: string, currency: string, country: string) =>
+    request("/api/payment/create-order", {
+      method: "POST",
+      body: JSON.stringify({ tier, provider, currency, country }),
+    }),
   createCheckout: (tier: string) =>
     request("/api/stripe/checkout", { method: "POST", body: JSON.stringify({ tier }) }),
 };

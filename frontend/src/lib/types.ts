@@ -145,6 +145,25 @@ export interface AnalyticsSnapshot {
   demographics: string;
 }
 
+export interface UserState {
+  id: string;
+  email: string;
+  subscription_tier: string;
+  usage: {
+    tier: string;
+    channels: { used: number; limit: number | null };
+    packages_this_month: { used: number; limit: number | null };
+    features: Record<string, boolean>;
+  };
+}
+
+export interface PaymentProvider {
+  id: string;
+  name: string;
+  regions: string[];
+  methods?: string[];
+}
+
 export interface Recommendation {
   id: number;
   channel_id: number;
