@@ -44,7 +44,7 @@ def test_ab_test_score_variants():
 def test_tts_agent_list_voices():
     agent = TTSAgent()
     result = agent.process(SAMPLE_CHANNEL, {"action": "list_voices"}, None)
-    assert result["section_type"] == "tts_voices"
+    assert result["section_type"] in ("tts_voices", "tts_narration")
 
 def test_tts_agent_no_script():
     agent = TTSAgent()

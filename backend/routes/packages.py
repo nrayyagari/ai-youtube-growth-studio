@@ -393,7 +393,7 @@ def export_package(package_id: int, format: str = "md"):
     conn.close()
 
     channel_name = channel["name"] if channel else "Unknown"
-    created = package.get("created_at", "")
+    created = package["created_at"] if package["created_at"] else ""
 
     md = f"""# Video Package #{package_id}
 
