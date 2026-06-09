@@ -71,6 +71,7 @@ def init_db():
             channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
             workflow_id INTEGER NOT NULL REFERENCES workflows(id),
             status TEXT DEFAULT 'DRAFT',
+            source_package_id INTEGER REFERENCES video_packages(id) ON DELETE SET NULL,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -200,6 +201,37 @@ def init_db():
             description TEXT DEFAULT '',
             priority INTEGER DEFAULT 0,
             based_on TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS content_calendar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            package_id INTEGER REFERENCES video_packages(id) ON DELETE SET NULL,
+            scheduled_date TEXT NOT NULL,
+            status TEXT DEFAULT 'planned',
+            slot_name TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS publishing_slots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+            day_of_week INTEGER NOT NULL,
+            hour INTEGER NOT NULL,
+            label TEXT DEFAULT '',
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS thumbnail_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            package_id INTEGER NOT NULL REFERENCES video_packages(id) ON DELETE CASCADE,
+            concept_name TEXT DEFAULT '',
+            image_path TEXT NOT NULL,
+            prompt_used TEXT DEFAULT '',
+            file_size_bytes INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now'))
         );
     """)

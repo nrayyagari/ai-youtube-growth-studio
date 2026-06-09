@@ -1,14 +1,71 @@
 import { useChannels, usePackages } from "../hooks/useApi";
 import { Link } from "react-router-dom";
+import { LoadingState, ErrorMessage } from "../components/ui/ErrorBoundary";
+import { useState, useMemo } from "react";
 
 export default function Dashboard() {
-  const { channels, loading } = useChannels();
+  const { channels, loading, error, reload } = useChannels();
   const { packages } = usePackages();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
-  if (loading) return <p style={{ color: "#888" }}>Loading...</p>;
+  if (loading) return <LoadingState text="Loading dashboard..." />;
+  if (error) return <ErrorMessage message={error} onRetry={reload} />;
+
+  const filtered = useMemo(() => {
+    return packages.filter((p) => {
+      if (statusFilter && p.status !== statusFilter) return false;
+      if (search) {
+        const lower = search.toLowerCase();
+        const sections = p.sections || [];
+        const hasMatch = sections.some((s: any) => {
+          try {
+            const c = JSON.parse(s.content);
+            return JSON.stringify(c).toLowerCase().includes(lower);
+          } catch { return false; }
+        });
+        return hasMatch || String(p.id).includes(lower);
+      }
+      return true;
+    });
+  }, [packages, search, statusFilter]);
 
   const approved = packages.filter((p) => p.status === "APPROVED");
   const needsWork = packages.filter((p) => p.status === "NEEDS_IMPROVEMENT");
+
+  const toggleSelect = (id: number) => {
+    const next = new Set(selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelected(next);
+  };
+
+  const toggleAll = () => {
+    if (selected.size === filtered.length) setSelected(new Set());
+    else setSelected(new Set(filtered.map((p) => p.id)));
+  };
+
+  const bulkApprove = async () => {
+    setBulkLoading(true);
+    for (const id of selected) {
+      try { await fetch(`/api/packages/${id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ override: true }) }); } catch {}
+    }
+    setSelected(new Set());
+    setBulkLoading(false);
+    reload();
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Delete ${selected.size} packages?`)) return;
+    setBulkLoading(true);
+    for (const id of selected) {
+      try { await fetch(`/api/packages/${id}`, { method: "DELETE" }); } catch {}
+    }
+    setSelected(new Set());
+    setBulkLoading(false);
+    reload();
+  };
 
   return (
     <div>
@@ -34,10 +91,38 @@ export default function Dashboard() {
 
       {packages.length > 0 && (
         <>
-          <h2 style={styles.h2}>Recent Packages</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={styles.h2}>Packages</h2>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                placeholder="Search packages..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #444", background: "#1e1e2e", color: "#eee", fontSize: 13, width: 180 }}
+              />
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #444", background: "#1e1e2e", color: "#eee", fontSize: 13 }}>
+                <option value="">All Status</option>
+                <option value="APPROVED">Approved</option>
+                <option value="NEEDS_IMPROVEMENT">Needs Work</option>
+                <option value="DRAFT">Draft</option>
+              </select>
+              {selected.size > 0 && (
+                <>
+                  <button onClick={bulkApprove} disabled={bulkLoading} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #4ade80", background: "transparent", color: "#4ade80", cursor: "pointer", fontSize: 12 }}>
+                    Approve {selected.size}
+                  </button>
+                  <button onClick={bulkDelete} disabled={bulkLoading} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #f87171", background: "transparent", color: "#f87171", cursor: "pointer", fontSize: 12 }}>
+                    Delete {selected.size}
+                  </button>
+                </>
+              )}
+              <span style={{ color: "#666", fontSize: 12 }}>{filtered.length} shown</span>
+            </div>
+          </div>
           <table style={styles.table}>
             <thead>
               <tr>
+                <th style={{ ...styles.th, width: 30 }}><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleAll} /></th>
                 <th style={styles.th}>ID</th>
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Created</th>
@@ -45,8 +130,9 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {packages.slice(0, 10).map((pkg) => (
+              {filtered.slice(0, 50).map((pkg) => (
                 <tr key={pkg.id} style={styles.tr}>
+                  <td style={styles.td}><input type="checkbox" checked={selected.has(pkg.id)} onChange={() => toggleSelect(pkg.id)} /></td>
                   <td style={styles.td}>#{pkg.id}</td>
                   <td style={styles.td}>
                     <span style={{

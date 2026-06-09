@@ -105,3 +105,53 @@ export interface StyleProfile {
   raw_analysis: Record<string, any>;
   created_at: string;
 }
+
+export interface CalendarEntry {
+  id: number;
+  channel_id: number;
+  package_id: number | null;
+  scheduled_date: string;
+  status: string;
+  slot_name: string;
+  notes: string;
+  package_status?: string;
+  created_at: string;
+}
+
+export interface PublishingSlot {
+  id: number;
+  channel_id: number;
+  day_of_week: number;
+  hour: number;
+  label: string;
+  enabled: number;
+}
+
+export interface BatchResult {
+  generated: number;
+  results: { package_id: number; topic: string; status: string }[];
+}
+
+export interface AnalyticsSnapshot {
+  id: number;
+  channel_id: number;
+  snapshot_date: string;
+  views: number;
+  watch_time_minutes: number;
+  subscribers: number;
+  avg_ctr: number;
+  avg_retention: number;
+  top_videos: string;
+  demographics: string;
+}
+
+export interface Recommendation {
+  id: number;
+  channel_id: number;
+  recommendation_type: string;
+  title: string;
+  description: string;
+  priority: number;
+  based_on: string;
+  created_at: string;
+}

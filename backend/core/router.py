@@ -65,7 +65,8 @@ class AIProviderRouter:
             return []
         return [k.strip() for k in row["value"].split(",") if k.strip()]
 
-    def generate(self, prompt: str, system_prompt: str = "", temperature: float = 0.7, max_tokens: int = 4096) -> str:
+    def generate(self, prompt: str, system_prompt: str = "", temperature: float = 0.7, max_tokens: int = 4096, **kwargs) -> str:
+        format_type = kwargs.get("format", "text")
         failures = []
         for name in self.ordering:
             cfg = self.PROVIDERS[name]
@@ -77,7 +78,10 @@ class AIProviderRouter:
                 if not self.tracker.can_call(name, cfg["rpm"]):
                     continue
                 try:
-                    result = self._call_provider(name, cfg, api_key, prompt, system_prompt, temperature, max_tokens)
+                    if format_type == "image" and name == "gemini":
+                        result = self._call_gemini_image(cfg, api_key, prompt)
+                    else:
+                        result = self._call_provider(name, cfg, api_key, prompt, system_prompt, temperature, max_tokens)
                     self.tracker.record(name)
                     return result
                 except Exception as e:
@@ -88,6 +92,41 @@ class AIProviderRouter:
         raise AllProvidersExhausted(
             "All AI providers failed. Details: " + "; ".join(failures)
         )
+
+    def _call_gemini_image(self, cfg: dict, api_key: str, prompt: str) -> str:
+        url = cfg["endpoint"].replace("{model}", cfg["model"]).replace("generateContent", "generateContent")
+        url += f"?key={api_key}"
+        body = {
+            "contents": [{"parts": [{"text": prompt}], "role": "user"}],
+            "generationConfig": {
+                "responseModalities": ["Text", "Image"],
+                "temperature": 0.9,
+            },
+        }
+        r = httpx.post(url, json=body, timeout=120)
+        if not r.is_success:
+            err = r.json().get("error", {}).get("message", r.text[:200])
+            raise Exception(f"HTTP {r.status_code}: {err}")
+
+        data = r.json()
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return ""
+
+        content = candidates[0].get("content", {})
+        parts = content.get("parts", [])
+
+        for part in parts:
+            if "inlineData" in part:
+                inline = part["inlineData"]
+                if inline.get("mimeType", "").startswith("image/"):
+                    b64 = inline.get("data", "")
+                    return f"data:{inline['mimeType']};base64,{b64}"
+            if "text" in part and not part.get("text", "").strip():
+                continue
+
+        text_parts = [p.get("text", "") for p in parts if "text" in p]
+        return "\n".join(text_parts) if text_parts else ""
 
     def _call_provider(self, name: str, cfg: dict, api_key: str, prompt: str, system_prompt: str, temperature: float, max_tokens: int) -> str:
         if name == "gemini":

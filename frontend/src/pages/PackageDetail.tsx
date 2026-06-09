@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import type { JSX } from "react";
 import { api } from "../lib/api";
@@ -7,9 +7,12 @@ import GrowthScoreBreakdown from "../components/reports/GrowthScoreBreakdown";
 
 export default function PackageDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [pkg, setPkg] = useState<VideoPackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [repurposing, setRepurposing] = useState(false);
+  const [repurposeResult, setRepurposeResult] = useState<any>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -59,12 +62,56 @@ export default function PackageDetail() {
     });
   }
 
+  const handleRepurpose = async () => {
+    if (!id) return;
+    setRepurposing(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/packages/${id}/repurpose`, { method: "POST" });
+      if (!r.ok) throw new Error((await r.json()).detail || "Repurpose failed");
+      setRepurposeResult(await r.json());
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setRepurposing(false);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={styles.h1}>Package #{pkg.id}</h1>
-        <Link to="/generate" style={styles.back}>← Generator</Link>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {pkg.status === "APPROVED" && (
+            <button onClick={handleRepurpose} disabled={repurposing} style={{
+              padding: "8px 14px",
+              borderRadius: 6,
+              border: "1px solid #a371f7",
+              background: "transparent",
+              color: "#a371f7",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              opacity: repurposing ? 0.5 : 1,
+            }}>
+              {repurposing ? "Repurposing..." : "Repurpose as Shorts"}
+            </button>
+          )}
+          <Link to="/generate" style={styles.back}>← Generator</Link>
+        </div>
       </div>
+
+      {repurposeResult && (
+        <div style={{ marginBottom: 16, padding: 12, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 6 }}>
+          <span style={{ color: "#4ade80", fontWeight: 600 }}>Created {repurposeResult.shorts_created} Shorts!</span>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {repurposeResult.shorts?.map((s: any) => (
+              <span key={s.package_id} onClick={() => navigate(`/packages/${s.package_id}`)} style={{ padding: "4px 10px", borderRadius: 4, background: "#16213e", color: "#a371f7", cursor: "pointer", fontSize: 12 }}>
+                #{s.package_id}: {s.title}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: 24 }}>
         <GrowthScoreBreakdown approval={approval} />

@@ -10,6 +10,8 @@ interface Snapshot {
   subscribers: number;
   avg_ctr: number;
   avg_retention: number;
+  top_videos: string;
+  demographics: string;
 }
 
 interface Comparison {
@@ -212,6 +214,75 @@ export default function Analytics() {
               {recommendations.length === 0 && <p style={styles.empty}>No recommendations yet.</p>}
             </div>
           </div>
+
+          {snapshots.length > 0 && (() => {
+            const latest = snapshots[0];
+            let topVideos: any[] = [];
+            try { topVideos = JSON.parse(latest.top_videos || "[]"); } catch {}
+            let demographics: any = {};
+            try { demographics = JSON.parse(latest.demographics || "{}"); } catch {}
+
+            if (topVideos.length > 0 || Object.keys(demographics).length > 0) {
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: Object.keys(demographics).length > 0 ? "1fr 1fr" : "1fr", gap: 16, marginTop: 16 }}>
+                  {topVideos.length > 0 && (
+                    <div style={styles.card}>
+                      <h3 style={styles.sectionTitle}>Top Videos</h3>
+                      {topVideos.slice(0, 5).map((v: any, i: number) => (
+                        <div key={i} style={styles.snapshotRow}>
+                          <span style={styles.date}>{i + 1}.</span>
+                          <span style={{ color: "#ccc", fontSize: 12, flex: 1 }}>{v.title || v.video_id || "Unknown"}</span>
+                          <span style={styles.metric}>{(v.views || 0).toLocaleString()} views</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {Object.keys(demographics).length > 0 && (
+                    <div style={styles.card}>
+                      <h3 style={styles.sectionTitle}>Demographics</h3>
+                      {demographics.age_groups && Object.keys(demographics.age_groups).length > 0 && (
+                        <div style={{ marginBottom: 12 }}>
+                          <span style={{ color: "#888", fontSize: 10, textTransform: "uppercase" }}>Age Groups</span>
+                          {Object.entries(demographics.age_groups).map(([age, pct]: [string, any]) => (
+                            <div key={age} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 12 }}>
+                              <span style={{ color: "#aaa" }}>{age}</span>
+                              <div style={{ flex: 1, margin: "0 8px", height: 6, background: "#333", borderRadius: 3 }}>
+                                <div style={{ height: "100%", width: `${pct}%`, background: "#e94560", borderRadius: 3 }} />
+                              </div>
+                              <span style={{ color: "#ccc", minWidth: 40, textAlign: "right" }}>{pct}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {demographics.gender && Object.keys(demographics.gender).length > 0 && (
+                        <div style={{ marginBottom: 12 }}>
+                          <span style={{ color: "#888", fontSize: 10, textTransform: "uppercase" }}>Gender</span>
+                          {Object.entries(demographics.gender).map(([g, pct]: [string, any]) => (
+                            <div key={g} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 12 }}>
+                              <span style={{ color: "#aaa" }}>{g}</span>
+                              <span style={{ color: "#ccc" }}>{pct}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {demographics.geography && Object.keys(demographics.geography).length > 0 && (
+                        <div>
+                          <span style={{ color: "#888", fontSize: 10, textTransform: "uppercase" }}>Top Geographies</span>
+                          {Object.entries(demographics.geography).slice(0, 5).map(([geo, pct]: [string, any]) => (
+                            <div key={geo} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 12 }}>
+                              <span style={{ color: "#aaa" }}>{geo}</span>
+                              <span style={{ color: "#ccc" }}>{pct}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return null;
+          })()}
         </>
       )}
     </div>

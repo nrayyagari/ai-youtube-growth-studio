@@ -34,6 +34,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ channel_id: channelId, workflow_id: workflowId, topic }),
     }),
+  batchGenerate: (channelId: number, workflowId: number, topics: string[], scheduleDays = 7) =>
+    request("/api/generate/batch", {
+      method: "POST",
+      body: JSON.stringify({ channel_id: channelId, workflow_id: workflowId, topics, schedule_days: scheduleDays }),
+    }),
+  approvePackage: (packageId: number, override = false) =>
+    request(`/api/packages/${packageId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ override }),
+    }),
+  regeneratePackage: (packageId: number, sections: string[] = []) =>
+    request(`/api/packages/${packageId}/regenerate`, {
+      method: "POST",
+      body: JSON.stringify({ sections }),
+    }),
   listPackages: (channelId?: number, status?: string) => {
     const params = new URLSearchParams();
     if (channelId) params.set("channel_id", String(channelId));
@@ -71,4 +86,27 @@ export const api = {
     request(`/api/channels/${channelId}/style-profiles`),
   deleteStyleProfile: (id: number) =>
     request(`/api/style-profiles/${id}`, { method: "DELETE" }),
+
+  // Content Calendar
+  listCalendar: (channelId?: number) =>
+    request(`/api/calendar${channelId ? `?channel_id=${channelId}` : ""}`),
+  addCalendarEntry: (data: { scheduled_date: string; package_id?: number; slot_name?: string; notes?: string }) =>
+    request("/api/calendar", { method: "POST", body: JSON.stringify(data) }),
+  deleteCalendarEntry: (id: number) =>
+    request(`/api/calendar/${id}`, { method: "DELETE" }),
+  listSlots: (channelId: number) =>
+    request(`/api/calendar/slots?channel_id=${channelId}`),
+  addSlot: (channelId: number, dayOfWeek: number, hour: number, label: string) =>
+    request(`/api/calendar/slots?channel_id=${channelId}`, {
+      method: "POST",
+      body: JSON.stringify({ day_of_week: dayOfWeek, hour, label }),
+    }),
+  deleteSlot: (id: number) =>
+    request(`/api/calendar/slots/${id}`, { method: "DELETE" }),
+
+  // Recommendations
+  generateRecommendations: (channelId: number) =>
+    request(`/api/channels/${channelId}/recommendations/generate`, { method: "POST" }),
+  listRecommendations: (channelId: number) =>
+    request(`/api/channels/${channelId}/recommendations`),
 };

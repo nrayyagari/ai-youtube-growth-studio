@@ -1,5 +1,6 @@
 import json
 import time
+from typing import Callable
 from agents.idea_agent import IdeaAgent
 from agents.script_agent import ScriptAgent
 from agents.visual_agent import VisualAgent
@@ -23,19 +24,31 @@ class PipelineRunner:
             QAAgent(),
         ]
 
-    def run(self, channel: dict, topic: str = "") -> dict:
+    def run(self, channel: dict, topic: str = "", skip_sections: set[str] | None = None,
+            on_progress: Callable[[dict], None] | None = None) -> dict:
         results = []
         inputs = {"topic": topic}
+        skip = skip_sections or set()
 
         for agent in self.agents:
+            if agent.name in skip:
+                if on_progress:
+                    on_progress({"agent": agent.name, "status": "skipped"})
+                continue
+            if on_progress:
+                on_progress({"agent": agent.name, "status": "running"})
             try:
                 result = agent.process(channel, inputs, self.router)
                 results.append(result)
                 output = result.get("output", {})
                 if isinstance(output, dict):
                     inputs.update(self._flatten_output(output, agent.name))
-                time.sleep(2)  # brief cooldown between agents
+                if on_progress:
+                    on_progress({"agent": agent.name, "status": "done", "section_type": result.get("section_type")})
+                time.sleep(2)
             except Exception as e:
+                if on_progress:
+                    on_progress({"agent": agent.name, "status": "error", "error": str(e)})
                 raise PipelineError(agent.name, str(e))
 
         approval = self._evaluate_approval(results)
@@ -128,11 +141,30 @@ class PipelineRunner:
                 scores["ctr_score"] = output.get("ctr_score", {}).get("score", 0)
             elif section_type == "thumbnail":
                 scores["thumbnail_score"] = output.get("score", {}).get("thumbnail_quality", {}).get("score", 0)
+            elif section_type == "music":
+                music_score = output.get("score", {})
+                if isinstance(music_score, dict):
+                    overall = music_score.get("overall") or music_score.get("score")
+                    if overall is None:
+                        for v in music_score.values():
+                            if isinstance(v, dict) and "score" in v:
+                                overall = v["score"]
+                                break
+                    scores["music_score"] = overall if overall is not None else 0
             elif section_type == "qa_report":
                 checks = output.get("checks", [])
+                qa_scores = []
                 for check in checks:
-                    key = f"{check.get('type', '')}_safety" if check.get("type") in ("copyright", "monetization") else check.get("type", "")
-                    scores[key] = check.get("score", 0)
+                    check_type = check.get("type", "")
+                    if check_type in ("copyright", "monetization"):
+                        scores[f"{check_type}_safety"] = check.get("score", 0)
+                    elif check_type == "factual":
+                        scores["factual_accuracy"] = check.get("score", 0)
+                    else:
+                        scores[check_type] = check.get("score", 0)
+                    qa_scores.append(check.get("score", 0))
+                if qa_scores:
+                    scores["qa_overall"] = sum(qa_scores) // len(qa_scores)
 
         return scores
 

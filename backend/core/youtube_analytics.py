@@ -285,3 +285,36 @@ class YouTubeAnalyticsService:
             "top_videos": json.dumps(analytics.get("daily_breakdown", [])),
             "demographics": "{}",
         }
+
+    def upload_video(
+        self,
+        title: str,
+        description: str = "",
+        tags: list[str] | None = None,
+        privacy_status: str = "private",
+        category_id: str = "27",
+    ) -> str:
+        _, _, build, _ = self._ensure_deps()
+        creds = self._get_credentials()
+        youtube = build("youtube", "v3", credentials=creds)
+
+        body = {
+            "snippet": {
+                "title": title[:100],
+                "description": description[:5000],
+                "tags": (tags or [])[:50],
+                "categoryId": category_id,
+            },
+            "status": {
+                "privacyStatus": privacy_status,
+                "madeForKids": False,
+                "selfDeclaredMadeForKids": False,
+            },
+        }
+
+        request = youtube.videos().insert(
+            part="snippet,status",
+            body=body,
+        )
+        response = request.execute()
+        return response["id"]

@@ -6,7 +6,17 @@ const links = [
   { to: "/workflows", label: "Workflows" },
   { to: "/skills", label: "Skills" },
   { to: "/generate", label: "Generator" },
+  { to: "/calendar", label: "Calendar" },
   { to: "/analytics", label: "Analytics" },
+  { to: "/competitors", label: "Competitors" },
+  { to: "/patterns", label: "Patterns" },
+  { to: "/ab-test", label: "A/B Test" },
+  { to: "/upload", label: "Upload" },
+  { to: "/compare", label: "Compare" },
+  { to: "/tts", label: "TTS" },
+  { to: "/whisper", label: "Whisper" },
+  { to: "/channel-analytics", label: "Ch. Stats" },
+  { to: "/thumbnails", label: "Thumbnails" },
   { to: "/settings", label: "Settings" },
 ];
 
