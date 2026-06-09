@@ -19,8 +19,6 @@ export default function Settings() {
   const [niche, setNiche] = useState("");
   const [audience, setAudience] = useState("");
   const [language, setLanguage] = useState("en");
-  const [frequency, setFrequency] = useState("");
-  const [monetization, setMonetization] = useState("");
   const [savingChannel, setSavingChannel] = useState(false);
 
   useEffect(() => {
@@ -35,8 +33,6 @@ export default function Settings() {
       setNiche(c.niche);
       setAudience(c.audience);
       setLanguage(c.language);
-      setFrequency(c.upload_frequency);
-      setMonetization(c.monetization_goal);
     }
   }, [channels, loading]);
 
@@ -63,7 +59,6 @@ export default function Settings() {
     try {
       await api.updateChannel(Number(channelId), {
         name: chName, niche, audience, language,
-        upload_frequency: frequency, monetization_goal: monetization,
       });
       setMessage("Channel updated.");
     } catch (e: any) {
@@ -153,14 +148,6 @@ export default function Settings() {
           <div style={styles.keyRow}>
             <label style={styles.keyLabel}>Language</label>
             <input value={language} onChange={(e) => setLanguage(e.target.value)} style={styles.input} />
-          </div>
-          <div style={styles.keyRow}>
-            <label style={styles.keyLabel}>Upload Frequency</label>
-            <input value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder="Weekly, Daily..." style={styles.input} />
-          </div>
-          <div style={styles.keyRow}>
-            <label style={styles.keyLabel}>Monetization Goal</label>
-            <input value={monetization} onChange={(e) => setMonetization(e.target.value)} placeholder="Ad revenue" style={styles.input} />
           </div>
           <button onClick={handleSaveChannel} disabled={savingChannel} style={styles.primaryBtn}>
             {savingChannel ? "Saving..." : "Save Channel"}

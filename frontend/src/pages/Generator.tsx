@@ -12,11 +12,11 @@ export default function Generator() {
 
   const [selectedChannel, setSelectedChannel] = useState("");
   const [topic, setTopic] = useState("");
+  const [language, setLanguage] = useState("en");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
-  const [newChannelNiche, setNewChannelNiche] = useState("");
   const [creatingChannel, setCreatingChannel] = useState(false);
 
   const usageLimit = user?.usage?.packages_this_month?.limit ?? null;
@@ -34,12 +34,11 @@ export default function Generator() {
     setCreatingChannel(true);
     setError("");
     try {
-      const result = await api.createChannel({ name: newChannelName.trim(), niche: newChannelNiche.trim() });
+      const result = await api.createChannel({ name: newChannelName.trim(), language });
       await reload();
       setSelectedChannel(String(result.id));
       setShowNewChannel(false);
       setNewChannelName("");
-      setNewChannelNiche("");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -88,13 +87,7 @@ export default function Generator() {
             style={styles.input}
             autoFocus
           />
-          <input
-            placeholder="Niche (e.g., AI, Tech, Education)"
-            value={newChannelNiche}
-            onChange={(e) => setNewChannelNiche(e.target.value)}
-            style={styles.input}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button onClick={handleCreateChannel} disabled={creatingChannel || !newChannelName.trim()} style={styles.primaryBtn}>
               {creatingChannel ? "Creating..." : "Create"}
             </button>
@@ -113,7 +106,16 @@ export default function Generator() {
         </div>
       )}
 
-      <label style={styles.label}>What's your video about?</label>
+      <label style={styles.label}>Language</label>
+      <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ ...styles.select, marginBottom: 24, width: "100%" }}>
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+      </select>
+
+      <label style={styles.label}>Topic</label>
       <textarea
         placeholder="How AI is changing remote work... (or leave blank — we'll suggest ideas)"
         value={topic}
