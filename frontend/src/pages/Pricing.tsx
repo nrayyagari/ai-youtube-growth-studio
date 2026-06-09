@@ -39,7 +39,7 @@ export default function Pricing() {
       </nav>
 
       <h1 style={styles.h1}>Pricing</h1>
-      <p style={styles.sub}>Start with the local-first workflow, then unlock higher limits when you turn it into a SaaS.</p>
+      <p style={styles.sub}>Start free — no credit card. Upgrade anytime for unlimited scripts and more channels.</p>
       {user && (
         <div style={styles.usage}>
           Current tier: <strong>{user.subscription_tier}</strong> · Packages this month: {user.usage?.packages_this_month.used ?? 0}/{user.usage?.packages_this_month.limit ?? "unlimited"}
