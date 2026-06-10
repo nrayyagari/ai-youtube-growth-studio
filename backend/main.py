@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -45,8 +45,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI YouTube Growth Studio", lifespan=lifespan)
 
-app.add_middleware(ErrorLoggingMiddleware)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
@@ -54,6 +52,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(ErrorLoggingMiddleware)
 
 app.include_router(packages_router)
 app.include_router(reference_router)

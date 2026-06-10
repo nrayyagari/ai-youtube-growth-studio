@@ -31,6 +31,7 @@ def init_db():
             agent_name TEXT DEFAULT '',
             fixed_by_agent INTEGER DEFAULT 0,
             fix_applied TEXT DEFAULT '',
+            metadata TEXT DEFAULT '{}',
             created_at TEXT DEFAULT (datetime('now'))
         );
 
