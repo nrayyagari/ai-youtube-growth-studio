@@ -9,31 +9,31 @@ export default function Landing() {
       <nav style={styles.nav}>
         <div style={styles.brand}>Growth Studio</div>
         <div style={styles.navLinks}>
-          <Link to="/pricing" style={styles.navLink}>Pricing</Link>
           {isAuthenticated ? (
             <Link to="/generate" style={styles.primarySmall}>Generate</Link>
           ) : (
-            <Link to="/login" style={styles.navLink}>Log in</Link>
+            <Link to="/login" style={styles.navLink}>Sign in</Link>
           )}
         </div>
       </nav>
 
       <section style={styles.hero}>
-        <p style={styles.kicker}>AI-powered script generation</p>
+        <p style={styles.kicker}>Your AI YouTube co-pilot</p>
         <h1 style={styles.h1}>Scripts that grow your channel — before you even record.</h1>
         <p style={styles.sub}>
-          Generate AI-optimized scripts, titles, scene plans, and SEO — tailored to what actually works on your channel.
+          Generate AI-optimized scripts, titles, scene plans, and SEO — tailored to what actually works. 
+          Bring your own API keys. Your data stays in your browser.
         </p>
         <div style={styles.actions}>
-          <Link to="/signup" style={styles.primary}>Start free — no credit card</Link>
+          <Link to="/generate" style={styles.primary}>Try it now — no signup needed →</Link>
         </div>
       </section>
 
       <section style={styles.band}>
         {[
           ["AI-powered scripts", "5 AI providers compete to write the best script for your topic."],
-          ["Your channel data", "Connect YouTube and our analytics engine learns what works for your audience."],
-          ["3 free scripts", "Generate up to 3 full script packages per month on the free plan."],
+          ["Reference-based style", "Paste a YouTube URL to match its pacing, tone, and structure."],
+          ["Your keys, your data", "Bring your own API keys. Zero data stored on our server."],
         ].map(([title, body]) => (
           <article key={title} style={styles.feature}>
             <h2 style={styles.h2}>{title}</h2>

@@ -1,5 +1,7 @@
 import json
 import time
+import httpx
+import re
 from typing import Callable
 from agents.idea_agent import IdeaAgent
 from agents.script_agent import ScriptAgent
@@ -8,7 +10,47 @@ from agents.music_agent import MusicAgent
 from agents.title_agent import TitleAgent
 from agents.thumbnail_agent import ThumbnailAgent
 from agents.qa_agent import QAAgent
+from agents.visual_reference_agent import VisualReferenceAgent
+from agents.script_from_reference_agent import ScriptFromReferenceAgent
 from core.router import AIProviderRouter
+
+
+def _extract_youtube_id(url: str) -> str:
+    patterns = [
+        r"(?:v=|\/)([0-9A-Za-z_-]{11})(?:[?&]|$)",
+        r"youtu\.be\/([0-9A-Za-z_-]{11})",
+        r"embed\/([0-9A-Za-z_-]{11})",
+    ]
+    for p in patterns:
+        m = re.search(p, url)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def _fetch_youtube_metadata(video_id: str) -> dict:
+    try:
+        oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        r = httpx.get(oembed_url, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            return {
+                "title": data.get("title", ""),
+                "channel_name": data.get("author_name", ""),
+                "thumbnail_url": data.get("thumbnail_url", ""),
+            }
+    except Exception:
+        pass
+    return {"title": "", "channel_name": "", "thumbnail_url": ""}
+
+
+def _fetch_youtube_transcript(video_id: str) -> str:
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return " ".join([entry["text"] for entry in transcript])
+    except Exception:
+        return ""
 
 
 class PipelineRunner:
@@ -23,6 +65,10 @@ class PipelineRunner:
             ThumbnailAgent(),
             QAAgent(),
         ]
+        self.ref_agents = [
+            VisualReferenceAgent(),
+            ScriptFromReferenceAgent(),
+        ]
 
     def run(self, channel: dict, topic: str = "", skip_sections: set[str] | None = None,
             on_progress: Callable[[dict], None] | None = None,
@@ -30,10 +76,49 @@ class PipelineRunner:
             reference_url: str | None = None) -> dict:
         results = []
         inputs = {"topic": topic}
-        if reference_url:
-            inputs["reference_url"] = reference_url
         skip = skip_sections or set()
         prompts = correction_prompts or {}
+
+        if reference_url:
+            try:
+                if on_progress:
+                    on_progress({"agent": "reference", "status": "fetching"})
+                video_id = _extract_youtube_id(reference_url)
+                meta = _fetch_youtube_metadata(video_id)
+                transcript = _fetch_youtube_transcript(video_id)
+                inputs["reference_url"] = reference_url
+                inputs["transcript"] = transcript
+                inputs["reference_meta"] = meta
+
+                if on_progress:
+                    on_progress({"agent": "reference", "status": "analyzing_visuals"})
+                vis_ref = VisualReferenceAgent()
+                vis_result = vis_ref.process(channel, inputs, self.router)
+                vis_output = vis_result.get("output", {})
+                if isinstance(vis_output, dict):
+                    inputs["visual_reference"] = vis_output
+                results.append(vis_result)
+                time.sleep(self.router.min_interval)
+
+                if on_progress:
+                    on_progress({"agent": "reference", "status": "writing_script"})
+                script_ref = ScriptFromReferenceAgent()
+                inputs["reference_style"] = inputs.get("reference_style", {})
+                script_result = script_ref.process(channel, inputs, self.router)
+                script_output = script_result.get("output", {})
+                if isinstance(script_output, dict):
+                    flat = self._flatten_ref_script(script_output)
+                    inputs.update(flat)
+                results.append(script_result)
+                time.sleep(self.router.min_interval)
+
+                skip.add("idea")
+                skip.add("visual")
+            except Exception as e:
+                if on_progress:
+                    on_progress({"agent": "reference", "status": "error", "error": str(e)})
+                skip.discard("idea")
+                skip.discard("visual")
 
         for agent in self.agents:
             if agent.name in skip:
@@ -60,9 +145,20 @@ class PipelineRunner:
 
         approval = self._evaluate_approval(results)
         return {
+            "id": inputs.get("id", ""),
+            "topic": topic,
+            "reference_used": bool(reference_url),
+            "reference_url": reference_url,
             "sections": results,
             "approval": approval,
+            "created_at": inputs.get("created_at", ""),
         }
+
+    def _flatten_ref_script(self, output: dict) -> dict:
+        flat = {}
+        flat["script"] = output.get("script", "")
+        flat["script_json"] = output
+        return flat
 
     def _flatten_output(self, output: dict, agent_name: str) -> dict:
         flat = {}
@@ -161,10 +257,11 @@ class PipelineRunner:
                             scores[f"idea_{cat}"] = val["score"]
             elif section_type == "script":
                 script_score = output.get("score", {})
-                for cat, val in script_score.items():
-                    if isinstance(val, dict) and "score" in val:
-                        key = "script_score" if cat == "script_quality" else cat
-                        scores[key] = val["score"]
+                if script_score:
+                    for cat, val in script_score.items():
+                        if isinstance(val, dict) and "score" in val:
+                            key = "script_score" if cat == "script_quality" else cat
+                            scores[key] = val["score"]
             elif section_type in ("visual", "scene_plan"):
                 visual_score = output.get("score", {})
                 if isinstance(visual_score, dict):

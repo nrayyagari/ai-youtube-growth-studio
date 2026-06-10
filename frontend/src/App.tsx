@@ -1,47 +1,25 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Generator from "./pages/Generator";
 import MyVideos from "./pages/MyVideos";
 import PackageDetail from "./pages/PackageDetail";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
-import Pricing from "./pages/Pricing";
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0f0f1a", color: "#ccc" }}>
-        Loading...
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-}
+import { AuthProvider } from "./contexts/AuthContext";
+import { StorageProvider } from "./contexts/StorageContext";
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/pricing" element={<Pricing />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
       <Route element={<ErrorBoundary><Layout /></ErrorBoundary>}>
-        <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />
-        <Route path="/my-videos" element={<ProtectedRoute><MyVideos /></ProtectedRoute>} />
-        <Route path="/packages/:id" element={<ProtectedRoute><PackageDetail /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/generate" element={<Generator />} />
+        <Route path="/my-videos" element={<MyVideos />} />
+        <Route path="/packages/:id" element={<PackageDetail />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );
@@ -51,7 +29,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <StorageProvider>
+          <AppRoutes />
+        </StorageProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -88,7 +88,6 @@ async def generate_package_stream(body: StreamGenerateRequest):
             while not future.done() or not queue.empty():
                 try:
                     event = queue.get_nowait()
-                    events_sent += 1
                     yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.QueueEmpty:
                     await asyncio.sleep(0.1)

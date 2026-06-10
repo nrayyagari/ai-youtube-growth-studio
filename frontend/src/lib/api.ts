@@ -17,126 +17,53 @@ async function request(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  // Channels
-  createChannel: (data: any) => request("/api/channels", { method: "POST", body: JSON.stringify(data) }),
-  listChannels: () => request("/api/channels"),
-  getChannel: (id: number) => request(`/api/channels/${id}`),
-  updateChannel: (id: number, data: any) =>
-    request(`/api/channels/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteChannel: (id: number) => request(`/api/channels/${id}`, { method: "DELETE" }),
+  // Generation
+  generate: (data: { topic: string; reference_url?: string; api_keys: Record<string, string>; channel: Record<string, string> }) =>
+    request("/api/generate", { method: "POST", body: JSON.stringify(data) }),
 
-  // Workflows
+  // Streaming generation
+  generateStream: (data: { topic: string; reference_url?: string; api_keys: Record<string, string>; channel: Record<string, string> }) => {
+    return fetch(`${API_BASE}/api/generate/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Workflows (hardcoded list)
   listWorkflows: () => request("/api/workflows"),
 
-  // Skills
-  listSkills: (category?: string) =>
-    request(`/api/skills${category ? `?category=${category}` : ""}`),
+  // Reference analysis
+  analyzeReference: (url: string) =>
+    request("/api/analyze", { method: "POST", body: JSON.stringify({ url }) }),
 
-  // Packages
-  generate: (channelId: number, workflowId: number, topic = "") =>
-    request("/api/generate", {
+  // YouTube
+  getYoutubeOAuthUrl: (clientId: string, clientSecret: string, redirectUri?: string) =>
+    request("/api/youtube/oauth/url", {
       method: "POST",
-      body: JSON.stringify({ channel_id: channelId, workflow_id: workflowId, topic }),
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri }),
     }),
-  batchGenerate: (channelId: number, workflowId: number, topics: string[], scheduleDays = 7) =>
-    request("/api/generate/batch", {
+  exchangeYoutubeCode: (clientId: string, clientSecret: string, code: string, redirectUri: string) =>
+    request("/api/youtube/exchange-code", {
       method: "POST",
-      body: JSON.stringify({ channel_id: channelId, workflow_id: workflowId, topics, schedule_days: scheduleDays }),
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, redirect_uri: redirectUri }),
     }),
-  approvePackage: (packageId: number, override = false) =>
-    request(`/api/packages/${packageId}/approve`, {
+  fetchMyRecentVideos: (refreshToken: string, clientId?: string, clientSecret?: string) =>
+    request("/api/youtube/my-recent-videos", {
       method: "POST",
-      body: JSON.stringify({ override }),
+      body: JSON.stringify({ refresh_token: refreshToken, client_id: clientId, client_secret: clientSecret }),
     }),
-  regeneratePackage: (packageId: number, sections: string[] = []) =>
-    request(`/api/packages/${packageId}/regenerate`, {
+  checkYoutubeStatus: (refreshToken: string) =>
+    request("/api/youtube/oauth/status", {
       method: "POST",
-      body: JSON.stringify({ sections }),
+      body: JSON.stringify({ refresh_token: refreshToken }),
     }),
-  listPackages: (channelId?: number, status?: string) => {
-    const params = new URLSearchParams();
-    if (channelId) params.set("channel_id", String(channelId));
-    if (status) params.set("status", status);
-    return request(`/api/packages?${params}`);
-  },
-  getPackage: (id: number) => request(`/api/packages/${id}`),
-  deletePackage: (id: number) => request(`/api/packages/${id}`, { method: "DELETE" }),
-  regenerate: (packageId: number) =>
-    request(`/api/packages/${packageId}/regenerate`, { method: "POST", body: "{}" }),
 
-  // Settings
-  getApiKeys: () => request("/api/settings/apikeys"),
-  updateApiKeys: (keys: any) =>
-    request("/api/settings/apikeys", { method: "PUT", body: JSON.stringify(keys) }),
-
-  // Reference Videos
-  addReferenceVideo: (channelId: number, url: string) =>
-    request(`/api/channels/${channelId}/reference-videos`, {
-      method: "POST",
-      body: JSON.stringify({ url }),
-    }),
-  listReferenceVideos: (channelId: number) =>
-    request(`/api/channels/${channelId}/reference-videos`),
-  deleteReferenceVideo: (id: number) =>
-    request(`/api/reference-videos/${id}`, { method: "DELETE" }),
-
-  // Style Profiles
-  generateStyleProfile: (channelId: number, name: string) =>
-    request(`/api/channels/${channelId}/style-profiles/generate`, {
-      method: "POST",
-      body: JSON.stringify({ name }),
-    }),
-  listStyleProfiles: (channelId: number) =>
-    request(`/api/channels/${channelId}/style-profiles`),
-  deleteStyleProfile: (id: number) =>
-    request(`/api/style-profiles/${id}`, { method: "DELETE" }),
-
-  // Content Calendar
-  listCalendar: (channelId?: number) =>
-    request(`/api/calendar${channelId ? `?channel_id=${channelId}` : ""}`),
-  addCalendarEntry: (data: { scheduled_date: string; package_id?: number; slot_name?: string; notes?: string }) =>
-    request("/api/calendar", { method: "POST", body: JSON.stringify(data) }),
-  deleteCalendarEntry: (id: number) =>
-    request(`/api/calendar/${id}`, { method: "DELETE" }),
-  listSlots: (channelId: number) =>
-    request(`/api/calendar/slots?channel_id=${channelId}`),
-  addSlot: (channelId: number, dayOfWeek: number, hour: number, label: string) =>
-    request(`/api/calendar/slots?channel_id=${channelId}`, {
-      method: "POST",
-      body: JSON.stringify({ day_of_week: dayOfWeek, hour, label }),
-    }),
-  deleteSlot: (id: number) =>
-    request(`/api/calendar/slots/${id}`, { method: "DELETE" }),
-
-  // Recommendations
-  generateRecommendations: (channelId: number) =>
-    request(`/api/channels/${channelId}/recommendations/generate`, { method: "POST" }),
-  listRecommendations: (channelId: number) =>
-    request(`/api/channels/${channelId}/recommendations`),
-
-  // Performance Learning
-  learnFromPerformance: (packageId: number) =>
-    request(`/api/youtube/learn/${packageId}`, { method: "POST" }),
-  listLearningResults: (channelId: number) =>
-    request(`/api/youtube/learn/${channelId}`),
-  linkPackageToVideo: (videoId: string, packageId: number) =>
-    request(`/api/youtube/link-package?video_id=${videoId}&package_id=${packageId}`, { method: "POST" }),
-
-  // Auth
-  signup: (email: string, password: string) =>
-    request("/api/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
-  login: (email: string, password: string) =>
-    request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
-
-  // SaaS account and billing
-  getMe: () => request("/api/user/me"),
-  getUsage: () => request("/api/user/usage"),
-  listPaymentProviders: () => request("/api/payment/providers"),
-  createPaymentOrder: (tier: string, provider: string, currency: string, country: string) =>
-    request("/api/payment/create-order", {
-      method: "POST",
-      body: JSON.stringify({ tier, provider, currency, country }),
-    }),
-  createCheckout: (tier: string) =>
-    request("/api/stripe/checkout", { method: "POST", body: JSON.stringify({ tier }) }),
+  // OTP Auth
+  otpSend: (email: string) =>
+    request("/api/auth/otp/send", { method: "POST", body: JSON.stringify({ email }) }),
+  otpVerify: (email: string, otp: string) =>
+    request("/api/auth/otp/verify", { method: "POST", body: JSON.stringify({ email, otp }) }),
+  getMe: (token: string) =>
+    request(`/api/auth/me?token=${encodeURIComponent(token)}`),
 };

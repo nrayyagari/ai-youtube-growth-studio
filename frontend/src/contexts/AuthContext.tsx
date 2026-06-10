@@ -1,37 +1,23 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
 
-export interface UserState {
-  id: string;
-  email: string;
-  subscription_tier: string;
-  usage: {
-    tier: string;
-    channels: { used: number; limit: number | null };
-    packages_this_month: { used: number; limit: number | null };
-    features: Record<string, boolean>;
-  } | null;
-}
-
 interface AuthContextValue {
-  user: UserState | null;
+  email: string | null;
+  token: string | null;
   loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  sendOtp: (email: string) => Promise<void>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
-  user: null,
+  email: null,
+  token: null,
   loading: true,
-  error: null,
-  refetch: async () => {},
   isAuthenticated: false,
-  login: async () => {},
-  signup: async () => {},
+  sendOtp: async () => {},
+  verifyOtp: async () => {},
   logout: () => {},
 });
 
@@ -48,61 +34,48 @@ function clearToken() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserState | null>(null);
+  const [token, setTokenState] = useState<string | null>(getToken());
+  const [email, setEmail] = useState<string | null>(localStorage.getItem("auth_email"));
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchUser = async () => {
-    if (!getToken()) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.getMe();
-      setUser(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load user");
-      setUser(null);
-      clearToken();
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchUser();
+    const savedToken = getToken();
+    if (savedToken) {
+      setTokenState(savedToken);
+      setEmail(localStorage.getItem("auth_email"));
+    }
+    setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const data = await api.login(email, password);
-    setToken(data.token);
-    await fetchUser();
+  const sendOtp = async (email: string) => {
+    await api.otpSend(email);
   };
 
-  const signup = async (email: string, password: string) => {
-    const data = await api.signup(email, password);
+  const verifyOtp = async (email: string, otp: string) => {
+    const data = await api.otpVerify(email, otp);
     setToken(data.token);
-    await fetchUser();
+    localStorage.setItem("auth_token", data.token);
+    localStorage.setItem("auth_email", email);
+    setTokenState(data.token);
+    setEmail(email);
   };
 
   const logout = () => {
     clearToken();
-    setUser(null);
+    localStorage.removeItem("auth_email");
+    setTokenState(null);
+    setEmail(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user,
+        email,
+        token,
         loading,
-        error,
-        refetch: fetchUser,
-        isAuthenticated: !!user,
-        login,
-        signup,
+        isAuthenticated: !!token,
+        sendOtp,
+        verifyOtp,
         logout,
       }}
     >
@@ -114,5 +87,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-
-export { AuthContext };
