@@ -1,12 +1,16 @@
 import os
+import asyncio
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from core.database import init_db
 from core.config import settings
+from core.error_logger import ErrorLoggingMiddleware
+from agents.health_monitor import HealthMonitor
 
 from routes.packages import router as packages_router
 from routes.reference import router as reference_router
@@ -14,14 +18,34 @@ from routes.youtube import router as youtube_router
 from routes.auth_otp import router as auth_otp_router
 from routes.workflows import router as workflows_router
 
+logger = logging.getLogger(__name__)
+
+
+async def health_loop():
+    monitor = HealthMonitor()
+    while True:
+        try:
+            monitor.run_hourly_check()
+        except Exception as e:
+            logger.error(f"HealthMonitor check failed: {e}")
+        await asyncio.sleep(3600)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    task = asyncio.create_task(health_loop())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="AI YouTube Growth Studio", lifespan=lifespan)
+
+app.add_middleware(ErrorLoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,6 +73,13 @@ def health():
     except Exception:
         db_ok = False
     return {"status": "ok", "database": db_ok}
+
+
+@app.post("/api/health/heal")
+def heal_now():
+    monitor = HealthMonitor()
+    result = monitor.check_and_heal()
+    return result
 
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

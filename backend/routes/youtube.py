@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 from core.config import settings
 from core.youtube_analytics import YouTubeAnalyticsService
+from core.router import AIProviderRouter, AllProvidersExhausted
+from agents.content_sequence_agent import ContentSequenceAgent
 
 router = APIRouter(prefix="/api/youtube", tags=["youtube"])
 
@@ -78,6 +80,52 @@ def exchange_code(body: dict):
     }
 
 
+class SuggestRequest(BaseModel):
+    refresh_token: str
+    client_id: str = ""
+    client_secret: str = ""
+    api_keys: dict = {}
+    max_results: int = 10
+
+
+@router.post("/suggest")
+def suggest_content(body: SuggestRequest):
+    cid = body.client_id or settings.youtube_client_id
+    secret = body.client_secret or settings.youtube_client_secret
+
+    if not cid or not secret:
+        raise HTTPException(400, "YouTube Client ID and Secret not configured")
+    if not body.refresh_token:
+        raise HTTPException(400, "No refresh token provided. Connect YouTube first.")
+    if not body.api_keys:
+        raise HTTPException(400, "At least one AI API key required.")
+
+    try:
+        svc = YouTubeAnalyticsService(cid, secret, body.refresh_token)
+        top_videos = svc.get_top_videos(body.max_results, 30)
+        videos_list = top_videos.get("videos", []) if isinstance(top_videos, dict) else []
+        channel_stats = svc.get_channel_stats()
+        analytics = svc.get_channel_analytics(30)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch YouTube data: {str(e)}")
+
+    try:
+        ai_router = AIProviderRouter()
+        ai_router.set_keys(body.api_keys)
+        agent = ContentSequenceAgent()
+        result = agent.process(
+            {"niche": "General", "audience": "General", "language": "en"},
+            {"videos": videos_list, "channel_stats": channel_stats, "analytics": analytics},
+            ai_router,
+        )
+    except AllProvidersExhausted as e:
+        raise HTTPException(429, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Suggestion AI failed: {str(e)}")
+
+    return result.get("output", {})
+
+
 class FetchVideosRequest(BaseModel):
     refresh_token: str
     client_id: str = ""
@@ -98,14 +146,15 @@ def fetch_my_recent_videos(body: FetchVideosRequest):
 
     try:
         svc = YouTubeAnalyticsService(cid, secret, body.refresh_token)
-        videos = svc.get_top_videos(body.max_results, 30)
+        top_videos = svc.get_top_videos(body.max_results, 30)
+        videos_list = top_videos.get("videos", []) if isinstance(top_videos, dict) else []
         channel_stats = svc.get_channel_stats()
         analytics = svc.get_channel_analytics(30)
     except Exception as e:
         raise HTTPException(500, f"Failed to fetch YouTube data: {str(e)}")
 
     return {
-        "videos": videos if isinstance(videos, list) else [],
+        "videos": videos_list,
         "channel_stats": channel_stats if isinstance(channel_stats, dict) else {},
         "analytics": analytics if isinstance(analytics, dict) else {},
     }
