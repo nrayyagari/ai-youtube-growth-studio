@@ -26,9 +26,12 @@ class PipelineRunner:
 
     def run(self, channel: dict, topic: str = "", skip_sections: set[str] | None = None,
             on_progress: Callable[[dict], None] | None = None,
-            correction_prompts: dict[str, str] | None = None) -> dict:
+            correction_prompts: dict[str, str] | None = None,
+            reference_url: str | None = None) -> dict:
         results = []
         inputs = {"topic": topic}
+        if reference_url:
+            inputs["reference_url"] = reference_url
         skip = skip_sections or set()
         prompts = correction_prompts or {}
 

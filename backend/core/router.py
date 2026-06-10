@@ -66,6 +66,12 @@ class AIProviderRouter:
     def __init__(self):
         self.tracker = RateTracker()
         self.ordering = ["gemini", "groq", "cerebras", "deepseek", "openai"]
+        self._user_keys: dict[str, list[str]] = {}
+
+    def set_keys(self, keys: dict[str, str]):
+        for provider, key in keys.items():
+            if key and provider in self.PROVIDERS:
+                self._user_keys[provider] = [k.strip() for k in key.split(",") if k.strip()]
 
     @property
     def min_interval(self) -> float:
@@ -75,22 +81,26 @@ class AIProviderRouter:
         )
         return 60.0 / lowest_rpm
 
-    def _get_db_keys(self, key_name: str) -> list[str]:
-        from core.database import get_db
+    def _get_keys(self, provider_name: str) -> list[str]:
+        user_keys = self._user_keys.get(provider_name, [])
+        if user_keys:
+            return user_keys
 
-        conn = get_db()
-        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key_name,)).fetchone()
-        conn.close()
-        if not row or not row["value"]:
-            return []
-        return [k.strip() for k in row["value"].split(",") if k.strip()]
+        from core.config import settings
+
+        env_key_name = f"{provider_name}_api_key"
+        env_key = getattr(settings, env_key_name, "")
+        if env_key:
+            return [k.strip() for k in env_key.split(",") if k.strip()]
+
+        return []
 
     def generate(self, prompt: str, system_prompt: str = "", temperature: float = 0.7, max_tokens: int = 4096, **kwargs) -> str:
         format_type = kwargs.get("format", "text")
         failures = []
         for name in self.ordering:
             cfg = self.PROVIDERS[name]
-            api_keys = self._get_db_keys(cfg["db_key"])
+            api_keys = self._get_keys(name)
             if not api_keys:
                 failures.append(f"{name}: no API key configured")
                 continue
