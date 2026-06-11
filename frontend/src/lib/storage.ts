@@ -1,4 +1,4 @@
-import type { ChannelProfile, ProviderKeys, VideoPackage, YoutubeTokens } from "./types";
+import type { ChannelProfile, ProviderKeys, VideoPackage, YoutubeOAuthConfig, YoutubeTokens } from "./types";
 
 const DB_NAME = "growth_studio";
 const DB_VERSION = 2;
@@ -204,6 +204,17 @@ export const storage = {
 
   async setYoutubeTokens(tokens: YoutubeTokens | null): Promise<void> {
     await this.setWorkspaceValue("youtube_tokens", tokens);
+  },
+
+  async getYoutubeOAuthConfig(): Promise<YoutubeOAuthConfig> {
+    return (await this.getWorkspaceValue<YoutubeOAuthConfig>("youtube_oauth_config")) || {
+      client_id: "",
+      client_secret: "",
+    };
+  },
+
+  async setYoutubeOAuthConfig(config: YoutubeOAuthConfig): Promise<void> {
+    await this.setWorkspaceValue("youtube_oauth_config", config);
   },
 
   async getAnalyticsCache(): Promise<Record<string, any>> {

@@ -2,7 +2,9 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
 const links = [
+  { to: "/workspace", label: "Workspace" },
   { to: "/generate", label: "Generate" },
+  { to: "/analytics", label: "Analytics" },
   { to: "/my-videos", label: "My Scripts" },
   { to: "/settings", label: "Settings" },
 ];

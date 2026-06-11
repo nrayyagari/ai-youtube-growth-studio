@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { api } from "../lib/api";
 import { storage } from "../lib/storage";
 import { backupToDrive, clearClientId, disconnectDrive, getClientId, getDriveAuthUrl, isDriveConnected, restoreFromDrive, setClientId } from "../lib/drive_sync";
 
@@ -9,6 +10,7 @@ export default function Settings() {
   const { email } = useAuth();
   const [tab, setTab] = useState<Tab>("apikeys");
   const [message, setMessage] = useState("");
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const [geminiKey, setGeminiKey] = useState("");
   const [groqKey, setGroqKey] = useState("");
@@ -17,23 +19,39 @@ export default function Settings() {
   const [channelNiche, setChannelNiche] = useState("");
   const [channelAudience, setChannelAudience] = useState("General audience");
   const [channelLanguage, setChannelLanguage] = useState("en");
+  const [youtubeClientId, setYoutubeClientId] = useState("");
+  const [youtubeClientSecret, setYoutubeClientSecret] = useState("");
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
   const [driveConnected, setDriveConnected] = useState(false);
   const [driveClientId, setDriveClientIdState] = useState("");
 
   useEffect(() => {
-    storage.getProviderKeys().then((keys) => {
+    Promise.all([
+      storage.getProviderKeys(),
+      storage.getChannelProfile(),
+      storage.getYoutubeOAuthConfig(),
+      storage.getYoutubeTokens(),
+    ]).then(async ([keys, profile, youtubeOauth, youtubeTokens]) => {
       setGeminiKey(keys.gemini || "");
       setGroqKey(keys.groq || "");
       setOpenaiKey(keys.openai || "");
-    });
-    storage.getChannelProfile().then((profile) => {
       setChannelName(profile.name);
       setChannelNiche(profile.niche);
       setChannelAudience(profile.audience);
       setChannelLanguage(profile.language);
+      setYoutubeClientId(youtubeOauth.client_id || "");
+      setYoutubeClientSecret(youtubeOauth.client_secret || "");
+      setDriveClientIdState(getClientId());
+      setDriveConnected(isDriveConnected());
+      if (youtubeTokens?.refresh_token && youtubeOauth.client_id && youtubeOauth.client_secret) {
+        try {
+          const status = await api.checkYoutubeStatus(youtubeTokens.refresh_token, youtubeOauth.client_id, youtubeOauth.client_secret);
+          setYoutubeConnected(!!status.connected);
+        } catch {
+          setYoutubeConnected(false);
+        }
+      }
     });
-    setDriveClientIdState(getClientId());
-    setDriveConnected(isDriveConnected());
   }, []);
 
   const handleSaveKeys = async () => {
@@ -44,6 +62,33 @@ export default function Settings() {
     });
     setMessage("API keys saved locally.");
     setTimeout(() => setMessage(""), 3000);
+  };
+
+  const handleExportLocalBackup = async () => {
+    const blob = await storage.exportAll();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `growth-studio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setMessage("Local backup downloaded to your device.");
+  };
+
+  const handleImportLocalBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as Record<string, unknown>;
+      const imported = await storage.importAll(payload as Record<string, any[]>);
+      setDriveConnected(isDriveConnected());
+      setMessage(imported > 0 ? `Imported ${imported} records from local backup.` : "Backup file was valid but did not contain importable records.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to import backup file.");
+    } finally {
+      event.target.value = "";
+    }
   };
 
   const handleSaveChannel = async () => {
@@ -65,6 +110,33 @@ export default function Settings() {
     }
     setClientId(clientId);
     window.location.href = getDriveAuthUrl(clientId);
+  };
+
+  const handleSaveYoutube = async () => {
+    await storage.setYoutubeOAuthConfig({
+      client_id: youtubeClientId,
+      client_secret: youtubeClientSecret,
+    });
+    setMessage("YouTube OAuth credentials saved locally.");
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  const handleConnectYoutube = async () => {
+    if (!youtubeClientId.trim() || !youtubeClientSecret.trim()) {
+      setMessage("Enter your YouTube OAuth client ID and secret first.");
+      return;
+    }
+    await storage.setYoutubeOAuthConfig({
+      client_id: youtubeClientId.trim(),
+      client_secret: youtubeClientSecret.trim(),
+    });
+    const redirectUri = `${window.location.origin}/youtube/callback`;
+    try {
+      const payload = await api.getYoutubeOAuthUrl(youtubeClientId.trim(), youtubeClientSecret.trim(), redirectUri);
+      window.location.href = payload.auth_url;
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to start YouTube connect flow.");
+    }
   };
 
   const tabs: { key: Tab; label: string }[] = [
@@ -95,6 +167,15 @@ export default function Settings() {
         <div>
           <h2 style={styles.h2}>AI Providers</h2>
           <p style={styles.hint}>Bring your own API keys. All data stays in your browser.</p>
+          <div style={styles.guideCard}>
+            <h3 style={styles.cardHeading}>How this works</h3>
+            <ol style={styles.steps}>
+              <li>Paste one or more provider keys here and save them locally in this browser.</li>
+              <li>When you generate a script, the selected key is sent only for that live request.</li>
+              <li>Your backend should redact secrets in logs and discard keys as soon as the response returns.</li>
+            </ol>
+            <p style={styles.smallHint}>Best practical default: add Gemini first, then OpenAI or Groq as fallback providers.</p>
+          </div>
           <div style={styles.keyRow}>
             <label style={styles.keyLabel}>Gemini API Key <span style={styles.keyHint}>gemini-2.0-flash — 15 RPM free</span></label>
             <input
@@ -132,6 +213,14 @@ export default function Settings() {
       {tab === "channel" && (
         <div>
           <h2 style={styles.h2}>Channel Profile</h2>
+          <div style={styles.guideCard}>
+            <h3 style={styles.cardHeading}>Recommended setup order</h3>
+            <ol style={styles.steps}>
+              <li>Save your basic channel profile so the agent knows your niche and audience.</li>
+              <li>Paste your Google OAuth client ID and secret for YouTube in this browser only.</li>
+              <li>Use the redirect URI below in Google Cloud, then connect YouTube and refresh analytics.</li>
+            </ol>
+          </div>
           <div style={styles.keyRow}>
             <label style={styles.keyLabel}>Channel Name</label>
             <input value={channelName} onChange={(e) => setChannelName(e.target.value)} style={styles.input} />
@@ -149,6 +238,36 @@ export default function Settings() {
             <input value={channelLanguage} onChange={(e) => setChannelLanguage(e.target.value)} placeholder="en" style={styles.input} />
           </div>
           <button onClick={handleSaveChannel} style={styles.primaryBtn}>Save Channel</button>
+
+          <div style={styles.integrationCard}>
+            <h2 style={styles.h2}>YouTube Connection</h2>
+            <p style={styles.hint}>Keep your YouTube OAuth credentials and refresh token only in this browser.</p>
+            <div style={styles.keyRow}>
+              <label style={styles.keyLabel}>YouTube OAuth Client ID</label>
+              <input value={youtubeClientId} onChange={(e) => setYoutubeClientId(e.target.value)} placeholder="Paste your Google OAuth client ID" style={styles.input} />
+            </div>
+            <div style={styles.keyRow}>
+              <label style={styles.keyLabel}>YouTube OAuth Client Secret</label>
+              <input type="password" value={youtubeClientSecret} onChange={(e) => setYoutubeClientSecret(e.target.value)} placeholder="Paste your Google OAuth client secret" style={styles.input} />
+            </div>
+            <p style={styles.smallHint}>Redirect URI to configure in Google Cloud: <code style={styles.code}>{window.location.origin}/youtube/callback</code></p>
+            <p style={styles.smallHint}>Status: {youtubeConnected ? "Connected" : "Not connected in this browser"}</p>
+            <p style={styles.smallHint}>Needed Google APIs: YouTube Data API v3 and YouTube Analytics API.</p>
+            <div style={styles.accountActions}>
+              <button onClick={handleSaveYoutube} style={styles.secondaryBtn}>Save YouTube Credentials</button>
+              <button onClick={handleConnectYoutube} style={styles.primaryBtnInline}>
+                {youtubeConnected ? "Reconnect YouTube" : "Connect YouTube"}
+              </button>
+              <button onClick={async () => {
+                await storage.setYoutubeTokens(null);
+                await storage.setAnalyticsCache({});
+                setYoutubeConnected(false);
+                setMessage("YouTube disconnected from this browser.");
+              }} style={styles.secondaryBtn}>
+                Disconnect YouTube
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -161,7 +280,17 @@ export default function Settings() {
           </div>
           <p style={styles.hint}>All data is stored in your browser. No server-side storage.</p>
           <div style={styles.accountCard}>
+            <p style={styles.accountText}>Workspace status</p>
+            <div style={styles.statusGrid}>
+              <StatusPill label="AI keys" active={Boolean(geminiKey || groqKey || openaiKey)} />
+              <StatusPill label="YouTube OAuth" active={Boolean(youtubeClientId && youtubeClientSecret)} />
+              <StatusPill label="YouTube connected" active={youtubeConnected} />
+              <StatusPill label="Drive backup" active={driveConnected} />
+            </div>
+          </div>
+          <div style={styles.accountCard}>
             <p style={styles.accountText}>Google Drive backup: {driveConnected ? "Connected" : "Not connected in this browser session"}</p>
+            <p style={styles.smallHint}>Use Drive if you want cloud backup without your server storing workspace data. Use local export if you prefer a file on your own machine.</p>
             <div style={styles.keyRow}>
               <label style={styles.keyLabel}>Google OAuth Client ID</label>
               <input
@@ -193,11 +322,39 @@ export default function Settings() {
               </button>
             </div>
           </div>
+          <div style={styles.accountCard}>
+            <p style={styles.accountText}>Local backup</p>
+            <p style={styles.smallHint}>Export everything from IndexedDB into a JSON file, or restore it later in this same browser or another browser.</p>
+            <div style={styles.accountActions}>
+              <button onClick={handleExportLocalBackup} style={styles.primaryBtnInline}>
+                Download Backup
+              </button>
+              <button onClick={() => importInputRef.current?.click()} style={styles.secondaryBtn}>
+                Import Backup File
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={handleImportLocalBackup}
+                style={{ display: "none" }}
+              />
+            </div>
+          </div>
           <button onClick={async () => { await storage.clearAll(); setMessage("Local data cleared."); }} style={styles.dangerBtn}>
             Clear Local Data
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatusPill({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div style={{ ...styles.statusPill, borderColor: active ? "#14532d" : "#333", background: active ? "rgba(34,197,94,0.12)" : "#11111c" }}>
+      <span style={{ ...styles.statusDot, background: active ? "#4ade80" : "#666" }} />
+      <span>{label}: {active ? "Ready" : "Missing"}</span>
     </div>
   );
 }
@@ -220,7 +377,15 @@ const styles: Record<string, React.CSSProperties> = {
   dangerBtn: { marginTop: 16, padding: "12px 24px", borderRadius: 6, border: "1px solid #e94560", background: "transparent", color: "#e94560", cursor: "pointer", fontWeight: 700, fontSize: 14 },
   success: { color: "#4ade80", fontSize: 14, marginBottom: 12 },
   accountCard: { marginTop: 16, padding: 16, borderRadius: 10, border: "1px solid #333", background: "#141421" },
+  integrationCard: { marginTop: 24, padding: 16, borderRadius: 10, border: "1px solid #333", background: "#141421" },
+  guideCard: { marginBottom: 20, padding: 16, borderRadius: 10, border: "1px solid #2f3344", background: "#11131d" },
+  cardHeading: { margin: "0 0 10px", color: "#f3f4f6", fontSize: 15 },
   accountText: { color: "#ccc", fontSize: 13, margin: "0 0 12px" },
   accountActions: { display: "flex", flexWrap: "wrap", gap: 10 },
   smallHint: { color: "#666", fontSize: 12, margin: "6px 0 0" },
+  code: { color: "#cbd5e1", background: "#11111c", padding: "2px 6px", borderRadius: 4 },
+  steps: { margin: "0 0 0 18px", padding: 0, color: "#cbd5e1", fontSize: 13, lineHeight: 1.6 },
+  statusGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
+  statusPill: { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 999, border: "1px solid #333", color: "#d4d4d8", fontSize: 12, fontWeight: 600 },
+  statusDot: { width: 8, height: 8, borderRadius: 999 },
 };

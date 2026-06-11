@@ -64,3 +64,26 @@ export interface YoutubeTokens {
   access_token?: string;
   expires_at?: number;
 }
+
+export interface YoutubeOAuthConfig {
+  client_id: string;
+  client_secret: string;
+}
+
+export interface YoutubeVideoSummary {
+  video_id?: string;
+  title?: string;
+  views?: number;
+  ctr?: number;
+  avg_view_duration_seconds?: number;
+  avg_view_percentage?: number;
+  published_at?: string;
+}
+
+export interface YoutubeAnalyticsCache {
+  videos?: YoutubeVideoSummary[];
+  channel_stats?: Record<string, any>;
+  analytics?: Record<string, any>;
+  recommendations?: Record<string, any>;
+  refreshed_at?: string;
+}

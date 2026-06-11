@@ -31,7 +31,7 @@ export default function Login() {
     setLoading(true);
     try {
       await verifyOtp(email, otp);
-      navigate("/generate");
+      navigate("/workspace");
     } catch (err: any) {
       setError(err.message);
     } finally {

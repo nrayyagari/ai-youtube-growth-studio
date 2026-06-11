@@ -10,7 +10,7 @@ export default function Landing() {
         <div style={styles.brand}>Growth Studio</div>
         <div style={styles.navLinks}>
           {isAuthenticated ? (
-            <Link to="/generate" style={styles.primarySmall}>Generate</Link>
+            <Link to="/workspace" style={styles.primarySmall}>Workspace</Link>
           ) : (
             <Link to="/login" style={styles.navLink}>Sign in</Link>
           )}
@@ -25,7 +25,7 @@ export default function Landing() {
           Bring your own API keys. Your data stays in your browser.
         </p>
         <div style={styles.actions}>
-          <Link to={isAuthenticated ? "/generate" : "/login"} style={styles.primary}>{isAuthenticated ? "Open your workspace →" : "Sign in to start →"}</Link>
+          <Link to={isAuthenticated ? "/workspace" : "/login"} style={styles.primary}>{isAuthenticated ? "Open your workspace →" : "Sign in to start →"}</Link>
         </div>
       </section>
 

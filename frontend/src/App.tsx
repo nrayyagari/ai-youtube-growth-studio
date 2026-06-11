@@ -1,12 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
+import Workspace from "./pages/Workspace";
 import Generator from "./pages/Generator";
+import Analytics from "./pages/Analytics";
 import MyVideos from "./pages/MyVideos";
 import PackageDetail from "./pages/PackageDetail";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import DriveCallback from "./pages/DriveCallback";
+import YoutubeCallback from "./pages/YoutubeCallback";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { StorageProvider } from "./contexts/StorageContext";
@@ -31,8 +34,11 @@ function AppRoutes() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/drive/callback" element={<DriveCallback />} />
+      <Route path="/youtube/callback" element={<YoutubeCallback />} />
       <Route element={<RequireAuth><ErrorBoundary><Layout /></ErrorBoundary></RequireAuth>}>
+        <Route path="/workspace" element={<Workspace />} />
         <Route path="/generate" element={<Generator />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/my-videos" element={<MyVideos />} />
         <Route path="/packages/:id" element={<PackageDetail />} />
         <Route path="/settings" element={<Settings />} />

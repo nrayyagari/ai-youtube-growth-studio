@@ -75,8 +75,9 @@ async function getOrCreateFile(): Promise<string | null> {
   const tokens = getTokens();
   if (!tokens || !isTokenValid(tokens)) return null;
 
+  const query = `name='${FILE_NAME}' and 'appDataFolder' in parents and trashed=false`;
   const searchUrl =
-    `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}'&fields=files(id,name)`;
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${encodeURIComponent(query)}&fields=files(id,name)`;
   const searchRes = await fetch(searchUrl, {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });

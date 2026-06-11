@@ -22,6 +22,7 @@ export default function MyVideos() {
         <div style={styles.emptyCard}>
           <h2 style={styles.emptyH2}>No scripts yet</h2>
           <p style={styles.emptyText}>Generate your first AI-powered script.</p>
+          <Link to="/workspace" style={styles.secondaryLink}>Check setup first</Link>
           <Link to="/generate" style={styles.emptyBtn}>Generate your first script →</Link>
         </div>
       </div>
@@ -84,5 +85,6 @@ const styles: Record<string, React.CSSProperties> = {
   emptyCard: { textAlign: "center", background: "#181827", border: "1px solid #343448", borderRadius: 12, padding: 40, maxWidth: 400 },
   emptyH2: { color: "#fff", marginBottom: 8 },
   emptyText: { color: "#999", marginBottom: 20 },
+  secondaryLink: { display: "inline-block", color: "#cbd5e1", textDecoration: "none", marginBottom: 12, fontSize: 13 },
   emptyBtn: { color: "#fff", background: "#e94560", padding: "12px 20px", borderRadius: 6, textDecoration: "none", fontWeight: 700 },
 };
