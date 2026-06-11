@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
 
     # App config
+    database_url: str = "sqlite:///./data/growth_studio.db"
     frontend_origin: str = "http://localhost:5173"
     app_base_url: str = "http://localhost:5173"
     jwt_secret: str = "change-me-in-production"

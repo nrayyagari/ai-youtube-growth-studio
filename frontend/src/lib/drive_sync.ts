@@ -8,7 +8,7 @@ interface DriveTokens {
   expiry: number;
 }
 
-function getClientId(): string {
+export function getClientId(): string {
   return localStorage.getItem(CLIENT_ID_STORAGE_KEY) || "";
 }
 

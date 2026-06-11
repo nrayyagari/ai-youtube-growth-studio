@@ -56,6 +56,6 @@ def extract_user_id(request) -> str:
             return payload["user_id"]
 
     if settings.dev_mode:
-        return request.headers.get("X-User-Id") or "local-dev-user"
+        return request.headers.get("X-User-Id") or ""
 
     return ""

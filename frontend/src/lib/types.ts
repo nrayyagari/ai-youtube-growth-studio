@@ -1,6 +1,6 @@
 export interface VideoPackage {
   id: string;
-  channel_id?: string;
+  topic?: string;
   sections?: PackageSection[];
   approval?: ApprovalResult;
   reference_used?: boolean;
@@ -9,9 +9,10 @@ export interface VideoPackage {
 }
 
 export interface PackageSection {
-  id?: number;
+  id?: string;
+  agent?: string;
   section_type: string;
-  content: string;
+  content: unknown;
   score: number;
 }
 
@@ -41,4 +42,25 @@ export interface StyleProfile {
   hooks?: string;
   thumbnails_style?: string;
   score?: Record<string, any>;
+}
+
+export interface ChannelProfile {
+  name: string;
+  niche: string;
+  audience: string;
+  language: string;
+}
+
+export interface ProviderKeys {
+  gemini?: string;
+  groq?: string;
+  cerebras?: string;
+  deepseek?: string;
+  openai?: string;
+}
+
+export interface YoutubeTokens {
+  refresh_token: string;
+  access_token?: string;
+  expires_at?: number;
 }

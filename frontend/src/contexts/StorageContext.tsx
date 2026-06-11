@@ -3,12 +3,10 @@ import { storage } from "../lib/storage";
 
 interface StorageContextValue {
   packages: any[];
-  channels: any[];
   referenceVideos: any[];
   settings: Record<string, any>;
   loading: boolean;
   refreshPackages: () => Promise<void>;
-  refreshChannels: () => Promise<void>;
   getSetting: (key: string) => Promise<any>;
   setSetting: (key: string, value: any) => Promise<void>;
 }
@@ -17,7 +15,6 @@ const StorageContext = createContext<StorageContextValue | null>(null);
 
 export function StorageProvider({ children }: { children: ReactNode }) {
   const [packages, setPackages] = useState<any[]>([]);
-  const [channels, setChannels] = useState<any[]>([]);
   const [referenceVideos, setReferenceVideos] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -25,11 +22,6 @@ export function StorageProvider({ children }: { children: ReactNode }) {
   const refreshPackages = useCallback(async () => {
     const data = await storage.listPackages();
     setPackages(data);
-  }, []);
-
-  const refreshChannels = useCallback(async () => {
-    const data = await storage.listChannels();
-    setChannels(data);
   }, []);
 
   const refreshReferenceVideos = useCallback(async () => {
@@ -49,15 +41,14 @@ export function StorageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     Promise.all([
       refreshPackages(),
-      refreshChannels(),
       refreshReferenceVideos(),
     ]).finally(() => setLoading(false));
-  }, [refreshPackages, refreshChannels, refreshReferenceVideos]);
+  }, [refreshPackages, refreshReferenceVideos]);
 
   return (
     <StorageContext.Provider value={{
-      packages, channels, referenceVideos, settings,
-      loading, refreshPackages, refreshChannels,
+      packages, referenceVideos, settings,
+      loading, refreshPackages,
       getSetting, setSetting,
     }}>
       {children}

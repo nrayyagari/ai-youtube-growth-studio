@@ -25,7 +25,7 @@ export default function Landing() {
           Bring your own API keys. Your data stays in your browser.
         </p>
         <div style={styles.actions}>
-          <Link to="/generate" style={styles.primary}>Try it now — no signup needed →</Link>
+          <Link to={isAuthenticated ? "/generate" : "/login"} style={styles.primary}>{isAuthenticated ? "Open your workspace →" : "Sign in to start →"}</Link>
         </div>
       </section>
 

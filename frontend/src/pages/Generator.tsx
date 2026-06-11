@@ -20,8 +20,8 @@ export default function Generator() {
     try {
       const { api_keys, channel } = await loadLocalConfig();
       const result = await api.generate({ topic, reference_url: referenceUrl || undefined, api_keys, channel });
-      await storage.savePackage(result);
-      navigate(`/packages/${result.id}`);
+      const packageId = await storage.savePackage(result);
+      navigate(`/packages/${packageId}`);
     } catch (e: any) {
       setError(e.message);
       setGenerating(false);
@@ -61,12 +61,11 @@ export default function Generator() {
 }
 
 async function loadLocalConfig(): Promise<{ api_keys: Record<string, string>; channel: Record<string, string> }> {
-  const gemini = await storage.getSetting("gemini_api_key") || "";
-  const groq = await storage.getSetting("groq_api_key") || "";
-  const channelName = await storage.getSetting("channel_name") || "My Channel";
+  const providerKeys = await storage.getProviderKeys();
+  const channel = await storage.getChannelProfile();
   return {
-    api_keys: { gemini_api_key: gemini, groq_api_key: groq },
-    channel: { name: channelName, language: "en" },
+    api_keys: providerKeys as Record<string, string>,
+    channel: channel as unknown as Record<string, string>,
   };
 }
 

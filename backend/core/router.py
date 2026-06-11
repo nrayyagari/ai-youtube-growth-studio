@@ -70,8 +70,13 @@ class AIProviderRouter:
 
     def set_keys(self, keys: dict[str, str]):
         for provider, key in keys.items():
-            if key and provider in self.PROVIDERS:
-                self._user_keys[provider] = [k.strip() for k in key.split(",") if k.strip()]
+            normalized = provider.strip().lower()
+            if normalized.endswith("_api_key"):
+                normalized = normalized[:-8]
+            if normalized == "grok":
+                normalized = "groq"
+            if key and normalized in self.PROVIDERS:
+                self._user_keys[normalized] = [k.strip() for k in key.split(",") if k.strip()]
 
     @property
     def min_interval(self) -> float:

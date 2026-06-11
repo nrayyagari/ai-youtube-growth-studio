@@ -2,12 +2,10 @@ import hashlib
 import random
 import smtplib
 import time
-import threading
 from email.mime.text import MIMEText
 from core.config import settings
+from core.database import get_db
 
-_otp_store: dict[str, dict] = {}
-_lock = threading.Lock()
 _MAX_ATTEMPTS = 3
 
 
@@ -15,16 +13,29 @@ def _hash_email(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:16]
 
 
+def _hash_otp(otp: str) -> str:
+    return hashlib.sha256(otp.encode()).hexdigest()
+
+
 def generate_and_send_otp(email: str) -> str:
     email_hash = _hash_email(email)
     otp = str(random.randint(100000, 999999))
+    expires_at = int(time.time()) + settings.otp_expiry_seconds
 
-    with _lock:
-        _otp_store[email_hash] = {
-            "otp": otp,
-            "expires_at": time.time() + settings.otp_expiry_seconds,
-            "attempts": 0,
-        }
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO otp_challenges (email_hash, otp_hash, expires_at, attempt_count)
+        VALUES (?, ?, ?, 0)
+        ON CONFLICT(email_hash) DO UPDATE SET
+            otp_hash = excluded.otp_hash,
+            expires_at = excluded.expires_at,
+            attempt_count = 0
+        """,
+        (email_hash, _hash_otp(otp), expires_at),
+    )
+    conn.commit()
+    conn.close()
 
     _send_email(email, otp)
     return otp
@@ -32,21 +43,35 @@ def generate_and_send_otp(email: str) -> str:
 
 def verify_otp(email: str, otp: str) -> bool:
     email_hash = _hash_email(email)
-    with _lock:
-        entry = _otp_store.get(email_hash)
-        if not entry:
-            return False
-        if time.time() > entry["expires_at"]:
-            del _otp_store[email_hash]
-            return False
-        if entry["attempts"] >= _MAX_ATTEMPTS:
-            del _otp_store[email_hash]
-            return False
-        if entry["otp"] != otp:
-            entry["attempts"] += 1
-            return False
-        del _otp_store[email_hash]
-        return True
+    conn = get_db()
+    row = conn.execute(
+        "SELECT otp_hash, expires_at, attempt_count FROM otp_challenges WHERE email_hash = ?",
+        (email_hash,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    now = int(time.time())
+    if now > row["expires_at"] or row["attempt_count"] >= _MAX_ATTEMPTS:
+        conn.execute("DELETE FROM otp_challenges WHERE email_hash = ?", (email_hash,))
+        conn.commit()
+        conn.close()
+        return False
+
+    if row["otp_hash"] != _hash_otp(otp):
+        conn.execute(
+            "UPDATE otp_challenges SET attempt_count = attempt_count + 1 WHERE email_hash = ?",
+            (email_hash,),
+        )
+        conn.commit()
+        conn.close()
+        return False
+
+    conn.execute("DELETE FROM otp_challenges WHERE email_hash = ?", (email_hash,))
+    conn.commit()
+    conn.close()
+    return True
 
 
 def _send_email(to_email: str, otp: str) -> None:
@@ -110,17 +135,11 @@ def _send_via_smtp(to_email: str, subject: str, body: str) -> None:
             server.sendmail(settings.email_from, [to_email], msg.as_string())
     except Exception as e:
         print(f"[EMAIL ERROR] SMTP: {e}")
-
-
-def _cleanup_worker():
-    while True:
-        time.sleep(60)
-        with _lock:
-            now = time.time()
-            expired = [k for k, v in _otp_store.items() if now > v["expires_at"]]
-            for k in expired:
-                del _otp_store[k]
-
-
-_cleanup_thread = threading.Thread(target=_cleanup_worker, daemon=True)
-_cleanup_thread.start()
+def cleanup_expired_otps() -> None:
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM otp_challenges WHERE expires_at < ?",
+        (int(time.time()),),
+    )
+    conn.commit()
+    conn.close()

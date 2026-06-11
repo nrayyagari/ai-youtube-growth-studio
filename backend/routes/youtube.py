@@ -4,11 +4,19 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from core.config import settings
+from core.auth import extract_user_id
 from core.youtube_analytics import YouTubeAnalyticsService
 from core.router import AIProviderRouter, AllProvidersExhausted
 from agents.content_sequence_agent import ContentSequenceAgent
 
 router = APIRouter(prefix="/api/youtube", tags=["youtube"])
+
+
+def _require_user(request: Request) -> str:
+    user_id = extract_user_id(request)
+    if not user_id:
+        raise HTTPException(401, "Authentication required")
+    return user_id
 
 
 class YouTubeOAuthConfig(BaseModel):
@@ -19,6 +27,7 @@ class YouTubeOAuthConfig(BaseModel):
 
 @router.post("/oauth/url")
 async def get_youtube_oauth_url(body: YouTubeOAuthConfig, req: Request):
+    _require_user(req)
     if body.redirect_uri:
         redirect_uri = body.redirect_uri
     else:
@@ -57,7 +66,8 @@ def youtube_oauth_callback(code: str, state: str = ""):
 
 
 @router.post("/exchange-code")
-def exchange_code(body: dict):
+def exchange_code(body: dict, request: Request):
+    _require_user(request)
     client_id = body.get("client_id", "")
     client_secret = body.get("client_secret", "")
     redirect_uri = body.get("redirect_uri", settings.youtube_redirect_uri)
@@ -89,7 +99,8 @@ class SuggestRequest(BaseModel):
 
 
 @router.post("/suggest")
-def suggest_content(body: SuggestRequest):
+def suggest_content(body: SuggestRequest, request: Request):
+    _require_user(request)
     cid = body.client_id or settings.youtube_client_id
     secret = body.client_secret or settings.youtube_client_secret
 
@@ -134,7 +145,8 @@ class FetchVideosRequest(BaseModel):
 
 
 @router.post("/my-recent-videos")
-def fetch_my_recent_videos(body: FetchVideosRequest):
+def fetch_my_recent_videos(body: FetchVideosRequest, request: Request):
+    _require_user(request)
     cid = body.client_id or settings.youtube_client_id
     secret = body.client_secret or settings.youtube_client_secret
 
@@ -161,7 +173,8 @@ def fetch_my_recent_videos(body: FetchVideosRequest):
 
 
 @router.post("/oauth/status")
-def youtube_oauth_status(body: dict):
+def youtube_oauth_status(body: dict, request: Request):
+    _require_user(request)
     refresh_token = body.get("refresh_token", "")
     cid = body.get("client_id", "") or settings.youtube_client_id
     secret = body.get("client_secret", "") or settings.youtube_client_secret

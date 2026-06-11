@@ -1,12 +1,15 @@
 const API_BASE = "";
 
-async function request(path: string, options: RequestInit = {}) {
+function buildHeaders(options: RequestInit = {}) {
   const token = localStorage.getItem("auth_token");
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  return { ...headers, ...((options.headers as Record<string, string>) || {}) };
+}
 
+async function request(path: string, options: RequestInit = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { ...headers, ...(options.headers as Record<string, string> || {}) },
+    headers: buildHeaders(options),
     ...options,
   });
   if (!res.ok) {
@@ -25,7 +28,7 @@ export const api = {
   generateStream: (data: { topic: string; reference_url?: string; api_keys: Record<string, string>; channel: Record<string, string> }) => {
     return fetch(`${API_BASE}/api/generate/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildHeaders(),
       body: JSON.stringify(data),
     });
   },
@@ -53,10 +56,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ refresh_token: refreshToken, client_id: clientId, client_secret: clientSecret }),
     }),
-  checkYoutubeStatus: (refreshToken: string) =>
+  checkYoutubeStatus: (refreshToken: string, clientId?: string, clientSecret?: string) =>
     request("/api/youtube/oauth/status", {
       method: "POST",
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      body: JSON.stringify({ refresh_token: refreshToken, client_id: clientId, client_secret: clientSecret }),
+    }),
+  suggestYoutubeContent: (data: { refreshToken: string; clientId?: string; clientSecret?: string; apiKeys: Record<string, string>; maxResults?: number }) =>
+    request("/api/youtube/suggest", {
+      method: "POST",
+      body: JSON.stringify({
+        refresh_token: data.refreshToken,
+        client_id: data.clientId,
+        client_secret: data.clientSecret,
+        api_keys: data.apiKeys,
+        max_results: data.maxResults,
+      }),
     }),
 
   // OTP Auth
@@ -64,6 +78,6 @@ export const api = {
     request("/api/auth/otp/send", { method: "POST", body: JSON.stringify({ email }) }),
   otpVerify: (email: string, otp: string) =>
     request("/api/auth/otp/verify", { method: "POST", body: JSON.stringify({ email, otp }) }),
-  getMe: (token: string) =>
-    request(`/api/auth/me?token=${encodeURIComponent(token)}`),
+  getMe: () =>
+    request("/api/auth/me"),
 };

@@ -1,12 +1,11 @@
 import hashlib
-import hmac
 import time
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from core.config import settings
-from core.otp import generate_and_send_otp, verify_otp
+from core.auth import verify_token
+from core.otp import cleanup_expired_otps, generate_and_send_otp, verify_otp
 from core.database import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -22,51 +21,66 @@ class VerifyOtpRequest(BaseModel):
 
 
 def _create_token(email: str) -> str:
-    email_hash = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:16]
+    normalized = email.strip().lower()
+    email_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
     email_provider = email.split("@")[1] if "@" in email else "unknown"
-    payload = {
+    payload = json.dumps({
+        "user_id": email_hash,
         "user_hash": email_hash,
         "email_provider": email_provider,
         "created_at": int(time.time()),
+        "iat": int(time.time()),
         "exp": int(time.time()) + 86400 * 30,  # 30 days
-    }
-    payload_b64 = json.dumps(payload).encode()
-    sig = hmac.new(settings.jwt_secret.encode(), payload_b64, "sha256").hexdigest()
-    return payload_b64.hex() + "." + sig
+    })
+    from core.config import settings
+    import hmac
+
+    sig = hmac.new(settings.jwt_secret.encode(), payload.encode(), "sha256").hexdigest()
+    return f"{payload}.{sig}"
 
 
 def decode_token(token: str) -> dict | None:
-    try:
-        parts = token.split(".")
-        if len(parts) != 2:
-            return None
-        payload_bytes = bytes.fromhex(parts[0])
-        sig = hmac.new(settings.jwt_secret.encode(), payload_bytes, "sha256").hexdigest()
-        if not hmac.compare_digest(sig, parts[1]):
-            return None
-        payload = json.loads(payload_bytes)
-        if time.time() > payload.get("exp", 0):
-            return None
-        return payload
-    except Exception:
-        return None
+    return verify_token(token)
+
+
+def _record_auth_event(event_type: str, email: str, metadata: dict | None = None) -> str:
+    normalized = email.strip().lower()
+    user_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO auth_events (user_hash, event_type, metadata) VALUES (?, ?, ?)",
+        (user_hash, event_type, json.dumps(metadata or {})),
+    )
+    if event_type == "login_success":
+        period = time.strftime("%Y-%m-%d")
+        conn.execute(
+            """
+            INSERT INTO login_aggregates (period, login_count, updated_at)
+            VALUES (?, 1, datetime('now'))
+            ON CONFLICT(period) DO UPDATE SET
+                login_count = login_count + 1,
+                updated_at = datetime('now')
+            """,
+            (period,),
+        )
+    conn.commit()
+    conn.close()
+    return user_hash
 
 
 @router.post("/otp/send")
-def send_otp(body: SendOtpRequest):
+def send_otp(body: SendOtpRequest, request: Request):
     email = body.email.strip().lower()
     if not email or "@" not in email:
         raise HTTPException(400, "Invalid email address")
 
+    cleanup_expired_otps()
     generate_and_send_otp(email)
-
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO usage_stats (event_type, user_hash) VALUES (?, ?)",
-        ("otp_sent", hashlib.sha256(email.encode()).hexdigest()[:16]),
+    _record_auth_event(
+        "otp_sent",
+        email,
+        metadata={"ip": request.client.host if request.client else "unknown"},
     )
-    conn.commit()
-    conn.close()
 
     return {"sent": True, "message": "If this email exists, an OTP has been sent."}
 
@@ -75,19 +89,11 @@ def send_otp(body: SendOtpRequest):
 def verify_otp_endpoint(body: VerifyOtpRequest):
     email = body.email.strip().lower()
     if not verify_otp(email, body.otp):
+        _record_auth_event("login_failed", email)
         raise HTTPException(401, "Invalid or expired OTP")
 
     token = _create_token(email)
-
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO usage_stats (event_type, user_hash) VALUES (?, ?)",
-        ("user_login", hashlib.sha256(email.encode()).hexdigest()[:16]),
-    )
-    conn.commit()
-    conn.close()
-
-    user_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
+    user_hash = _record_auth_event("login_success", email)
     email_provider = email.split("@")[1] if "@" in email else "unknown"
 
     return {
@@ -98,11 +104,10 @@ def verify_otp_endpoint(body: VerifyOtpRequest):
 
 
 @router.get("/me")
-def get_me(token: str = ""):
-    from fastapi import Header
-
-    # Token can come as query param or Authorization header
-    # We handle header in the route dependency — keeping it simple
+def get_me(request: Request, token: str = ""):
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:]
     payload = decode_token(token)
     if not payload:
         raise HTTPException(401, "Invalid or expired token")
