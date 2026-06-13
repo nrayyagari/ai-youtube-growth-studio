@@ -86,5 +86,5 @@ const styles: Record<string, React.CSSProperties> = {
   emptyH2: { color: "#fff", marginBottom: 8 },
   emptyText: { color: "#999", marginBottom: 20 },
   secondaryLink: { display: "inline-block", color: "#cbd5e1", textDecoration: "none", marginBottom: 12, fontSize: 13 },
-  emptyBtn: { color: "#fff", background: "#e94560", padding: "12px 20px", borderRadius: 6, textDecoration: "none", fontWeight: 700 },
+  emptyBtn: { color: "#fff", background: "#e94560", padding: "12px 20px", borderRadius: 6, textDecoration: "none", fontWeight: 700, whiteSpace: "nowrap" },
 };

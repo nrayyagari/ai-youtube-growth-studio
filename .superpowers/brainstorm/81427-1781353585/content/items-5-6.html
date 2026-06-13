@@ -1,0 +1,123 @@
+<h2>Item 5: "Generate first script" — Text wrap fix</h2>
+<p class="subtitle">Currently the button text wraps to a second line. Fix with whiteSpace: "nowrap"</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">❌ Current — button text wrapping</div>
+    <div class="mockup-body" style="max-width:320px;margin:0 auto">
+      <div style="text-align:center;padding:24px;border:1px solid #343448;border-radius:12px;background:#181827">
+        <h3 style="color:#fff;margin-bottom:8px;font-size:16px">No scripts yet</h3>
+        <p style="color:#999;margin-bottom:16px;font-size:13px">Generate your first AI-powered script.</p>
+        <div style="color:#fff;background:#e94560;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;font-size:14px">
+          Generate your first<br>script →
+        </div>
+        <p style="color:#f87171;font-size:11px;margin-top:12px">Text breaks to second line</p>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">✅ Fixed — single line</div>
+    <div class="mockup-body" style="max-width:320px;margin:0 auto">
+      <div style="text-align:center;padding:24px;border:1px solid #4ade80;border-radius:12px;background:#181827">
+        <h3 style="color:#fff;margin-bottom:8px;font-size:16px">No scripts yet</h3>
+        <p style="color:#999;margin-bottom:16px;font-size:13px">Generate your first AI-powered script.</p>
+        <div style="color:#fff;background:#e94560;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;font-size:14px;white-space:nowrap">
+          Generate your first script →
+        </div>
+        <p style="color:#4ade80;font-size:11px;margin-top:12px;font-weight:700">✓ Stays on one line</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:16px;color:#cbd5e1;font-size:13px;text-align:center">Fix: Add <code style="color:#8fd3ff">whiteSpace: "nowrap"</code> to the <code>emptyBtn</code> style in <strong>MyVideos.tsx</strong> line 89</p>
+
+<div class="section" style="margin-top:32px">
+  <h2>Item 6: App Analysis — Additional Recommendations</h2>
+  <p class="subtitle">What I would add if building this to production quality</p>
+</div>
+
+<div class="cards">
+  <div class="card" style="border-color:#4ade80">
+    <div class="card-body">
+      <h3>A. Error visibility everywhere</h3>
+      <p>Every API call shows a loading spinner + error in red (not green). Currently errors use the same green "success" style. Add toast notifications at top-right for transient feedback.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#8fd3ff">
+    <div class="card-body">
+      <h3>B. Loading / empty states</h3>
+      <p>Analytics, MyVideos, and Packages pages need proper skeletons while loading, not just "Loading..." text. Empty states already exist in MyVideos but are missing in Analytics and Generate.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#facc15">
+    <div class="card-body">
+      <h3>C. Mobile responsive layout</h3>
+      <p>The app currently uses fixed widths and two-column grids that break on mobile. Add media queries for single-column stack on screens &lt; 768px. Workspace hero grid collapses.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#e94560">
+    <div class="card-body">
+      <h3>D. JWT_SECRET hardening</h3>
+      <p>Currently defaults to "change-me-in-production". Generate a random 64-char secret at first container start if not configured. Log a warning if the default secret is used.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#4ade80">
+    <div class="card-body">
+      <h3>E. Provider key validation</h3>
+      <p>Test API keys on save — make a lightweight request to each provider to confirm validity. Show ✓ Valid / ✗ Invalid immediately, not during generation when it's too late.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#8fd3ff">
+    <div class="card-body">
+      <h3>F. Dark/light mode toggle</h3>
+      <p>Currently forced dark mode. Add a toggle in sidebar/navbar that respects OS preference by default (prefers-color-scheme). Persist user choice in localStorage.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#facc15">
+    <div class="card-body">
+      <h3>G. Script export formats</h3>
+      <p>Add "Export as Markdown" and "Export as PDF" buttons on the Package detail page. Content creators need to take scripts offline for recording.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:#e94560">
+    <div class="card-body">
+      <h3>H. Rate limit feedback</h3>
+      <p>When free-tier rate limits are hit (e.g., Gemini 15 RPM), show remaining quota in the UI and an ETA for reset. Currently it silently cycles providers.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:32px">
+  <h3>Priority ranking for your 6 requests</h3>
+  <div style="display:grid;gap:8px;margin-top:12px">
+    <div style="padding:10px;border:1px solid #4ade80;border-radius:6px;display:flex;gap:12px;align-items:center">
+      <span style="font-weight:800;color:#4ade80;font-size:18px;min-width:28px">1</span>
+      <div>
+        <strong style="color:#fff">Save badges + delete + button states</strong>
+        <p style="margin:4px 0 0;color:#9ca3af;font-size:12px">Biggest UX impact. Makes the app feel responsive and trustworthy. Frontend only.</p>
+      </div>
+    </div>
+    <div style="padding:10px;border:1px solid #8fd3ff;border-radius:6px;display:flex;gap:12px;align-items:center">
+      <span style="font-weight:800;color:#8fd3ff;font-size:18px;min-width:28px">2</span>
+      <div>
+        <strong style="color:#fff">YouTube channel URL + auto-fetch</strong>
+        <p style="margin:4px 0 0;color:#9ca3af;font-size:12px">Frontend (field + fetch button) + 1 new backend endpoint to resolve channel URL.</p>
+      </div>
+    </div>
+    <div style="padding:10px;border:1px solid #facc15;border-radius:6px;display:flex;gap:12px;align-items:center">
+      <span style="font-weight:800;color:#facc15;font-size:18px;min-width:28px">3</span>
+      <div>
+        <strong style="color:#fff">10 API providers</strong>
+        <p style="margin:4px 0 0;color:#9ca3af;font-size:12px">Backend config + router + frontend types/Settings. Adds 5 new provider endpoints.</p>
+      </div>
+    </div>
+    <div style="padding:10px;border:1px solid #e94560;border-radius:6px;display:flex;gap:12px;align-items:center">
+      <span style="font-weight:800;color:#e94560;font-size:18px;min-width:28px">4</span>
+      <div>
+        <strong style="color:#fff">"Generate first script" line fix</strong>
+        <p style="margin:4px 0 0;color:#9ca3af;font-size:12px">One-line CSS fix. Trivial.</p>
+      </div>
+    </div>
+  </div>
+</div>

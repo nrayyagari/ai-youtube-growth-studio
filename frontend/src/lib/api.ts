@@ -40,6 +40,10 @@ export const api = {
   analyzeReference: (url: string) =>
     request("/api/analyze", { method: "POST", body: JSON.stringify({ url }) }),
 
+  // YouTube channel URL resolution
+  resolveChannelUrl: (url: string) =>
+    request(`/api/youtube/resolve-channel?url=${encodeURIComponent(url)}`),
+
   // YouTube
   getYoutubeOAuthUrl: (clientId: string, clientSecret: string, redirectUri?: string) =>
     request("/api/youtube/oauth/url", {

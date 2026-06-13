@@ -190,6 +190,7 @@ export const storage = {
         niche: "",
         audience: "General audience",
         language: "en",
+        channel_url: "",
       }
     );
   },

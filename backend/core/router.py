@@ -61,11 +61,41 @@ class AIProviderRouter:
             "endpoint": "https://api.openai.com/v1/chat/completions",
             "db_key": "openai_api_key",
         },
+        "anthropic": {
+            "model": "claude-3-5-sonnet-latest",
+            "rpm": 50,
+            "endpoint": "https://api.anthropic.com/v1/messages",
+            "db_key": "anthropic_api_key",
+        },
+        "mistral": {
+            "model": "mistral-large-latest",
+            "rpm": 30,
+            "endpoint": "https://api.mistral.ai/v1/chat/completions",
+            "db_key": "mistral_api_key",
+        },
+        "together": {
+            "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "rpm": 60,
+            "endpoint": "https://api.together.xyz/v1/chat/completions",
+            "db_key": "together_api_key",
+        },
+        "cohere": {
+            "model": "command-r-plus",
+            "rpm": 40,
+            "endpoint": "https://api.cohere.ai/v1/chat",
+            "db_key": "cohere_api_key",
+        },
+        "xai": {
+            "model": "grok-2-1212",
+            "rpm": 20,
+            "endpoint": "https://api.x.ai/v1/chat/completions",
+            "db_key": "xai_api_key",
+        },
     }
 
     def __init__(self):
         self.tracker = RateTracker()
-        self.ordering = ["gemini", "groq", "cerebras", "deepseek", "openai"]
+        self.ordering = ["gemini", "groq", "cerebras", "deepseek", "openai", "anthropic", "mistral", "together", "cohere", "xai"]
         self._user_keys: dict[str, list[str]] = {}
 
     def set_keys(self, keys: dict[str, str]):
@@ -166,6 +196,10 @@ class AIProviderRouter:
     def _call_provider(self, name: str, cfg: dict, api_key: str, prompt: str, system_prompt: str, temperature: float, max_tokens: int) -> str:
         if name == "gemini":
             return self._call_gemini(cfg, api_key, prompt, system_prompt, temperature, max_tokens)
+        if name == "anthropic":
+            return self._call_anthropic(cfg, api_key, prompt, system_prompt, temperature, max_tokens)
+        if name == "cohere":
+            return self._call_cohere(cfg, api_key, prompt, system_prompt, temperature, max_tokens)
         return self._call_openai_compatible(cfg, api_key, prompt, system_prompt, temperature, max_tokens)
 
     def _call_gemini(self, cfg: dict, api_key: str, prompt: str, system_prompt: str, temperature: float, max_tokens: int) -> str:
@@ -185,6 +219,45 @@ class AIProviderRouter:
             raise Exception(f"HTTP {r.status_code}: {err}")
         data = r.json()
         return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    def _call_anthropic(self, cfg: dict, api_key: str, prompt: str, system_prompt: str, temperature: float, max_tokens: int) -> str:
+        messages = [{"role": "user", "content": prompt}]
+        body = {
+            "model": cfg["model"],
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if system_prompt:
+            body["system"] = system_prompt
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        r = httpx.post(cfg["endpoint"], json=body, headers=headers, timeout=60)
+        if not r.is_success:
+            err = r.json().get("error", {}).get("message", r.text[:200])
+            raise Exception(f"HTTP {r.status_code}: {err}")
+        data = r.json()
+        return data["content"][0]["text"]
+
+    def _call_cohere(self, cfg: dict, api_key: str, prompt: str, system_prompt: str, temperature: float, max_tokens: int) -> str:
+        body = {
+            "model": cfg["model"],
+            "message": prompt,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if system_prompt:
+            body["preamble"] = system_prompt
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        r = httpx.post(cfg["endpoint"], json=body, headers=headers, timeout=60)
+        if not r.is_success:
+            err = r.json().get("message", r.text[:200])
+            raise Exception(f"HTTP {r.status_code}: {err}")
+        data = r.json()
+        return data["text"]
 
     def _call_openai_compatible(self, cfg: dict, api_key: str, prompt: str, system_prompt: str, temperature: float, max_tokens: int) -> str:
         messages = []

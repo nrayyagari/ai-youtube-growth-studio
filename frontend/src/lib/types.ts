@@ -49,6 +49,7 @@ export interface ChannelProfile {
   niche: string;
   audience: string;
   language: string;
+  channel_url?: string;
 }
 
 export interface ProviderKeys {
@@ -57,6 +58,11 @@ export interface ProviderKeys {
   cerebras?: string;
   deepseek?: string;
   openai?: string;
+  anthropic?: string;
+  mistral?: string;
+  together?: string;
+  cohere?: string;
+  xai?: string;
 }
 
 export interface YoutubeTokens {

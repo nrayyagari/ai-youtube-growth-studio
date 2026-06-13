@@ -65,6 +65,23 @@ def youtube_oauth_callback(code: str, state: str = ""):
     ))
 
 
+@router.get("/resolve-channel")
+def resolve_channel(url: str):
+    try:
+        from yt_dlp import YoutubeDL
+        ydl_opts = {"quiet": True, "skip_download": True, "extract_flat": True}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return {
+                "channel_id": info.get("channel_id") or info.get("uploader_id"),
+                "title": info.get("channel") or info.get("uploader") or "",
+                "description": info.get("description", ""),
+                "thumbnail": info.get("thumbnail", ""),
+            }
+    except Exception as e:
+        raise HTTPException(400, f"Could not resolve channel: {str(e)}")
+
+
 @router.post("/exchange-code")
 def exchange_code(body: dict, request: Request):
     _require_user(request)

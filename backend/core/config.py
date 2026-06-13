@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     cerebras_api_key: str = ""
     deepseek_api_key: str = ""
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    mistral_api_key: str = ""
+    together_api_key: str = ""
+    cohere_api_key: str = ""
+    xai_api_key: str = ""
 
     # App config
     database_url: str = "sqlite:///./data/growth_studio.db"

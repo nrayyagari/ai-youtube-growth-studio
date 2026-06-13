@@ -100,7 +100,18 @@ async function loadLocalConfig(): Promise<{ api_keys: Record<string, string>; ch
   const providerKeys = await storage.getProviderKeys();
   const channel = await storage.getChannelProfile();
   return {
-    api_keys: providerKeys as Record<string, string>,
+    api_keys: {
+      gemini: providerKeys.gemini || "",
+      groq: providerKeys.groq || "",
+      cerebras: providerKeys.cerebras || "",
+      deepseek: providerKeys.deepseek || "",
+      openai: providerKeys.openai || "",
+      anthropic: providerKeys.anthropic || "",
+      mistral: providerKeys.mistral || "",
+      together: providerKeys.together || "",
+      cohere: providerKeys.cohere || "",
+      xai: providerKeys.xai || "",
+    },
     channel: channel as unknown as Record<string, string>,
   };
 }
